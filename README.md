@@ -1,4 +1,4 @@
-# 🏆 Gestor Universal de Torneos
+# Gestor Universal de Torneos
 
 > **Trabajo Final  — Tecnicatura Universitaria en Programación a Distancia (TUPaD - UTN)**
 
@@ -6,14 +6,14 @@ Plataforma web liviana, flexible y parametrizable para la creación, administrac
 
 ---
 
-## 👥 Integrantes del Proyecto
+## Integrantes del Proyecto
 * **Daniela Romero** — Legajo N.º 234
 * **Giuliano Scaglioni** — Legajo N.º 5736
 * **Repositorio oficial:** [NaD3M-71/gestor-universal-torneos](https://github.com/NaD3M-71/gestor-universal-torneos)
 
 ---
 
-## 📌 1. Resumen y Propuesta de Valor
+## 1. Resumen y Propuesta de Valor
 
 El **Gestor Universal de Torneos** resuelve la necesidad de organizar competencias tanto informales (eventos relámpago de 4 participantes) como estructuradas (ligas institucionales o comunitarias de 20+ equipos).
 
@@ -23,13 +23,13 @@ El **Gestor Universal de Torneos** resuelve la necesidad de organizar competenci
 
 ---
 
-## 🛠️ 2. Arquitectura y Stack Tecnológico
+## 2. Arquitectura y Stack Tecnológico
 
 El sistema implementa una **Arquitectura Desacoplada (API REST + SPA)** con el patrón **MVC Distribuido**:
 
 * **Frontend (Vista):** React + TypeScript (Single Page Application).
 * **Backend (Controlador):** Node.js + Express + TypeScript.
-* **Base de Datos (Modelo):** PostgreSQL / Motor Relacional (SQL) con restricciones referenciales en cascada y consultas de agregación optimizadas.
+* **Base de Datos (Modelo):** Motor Relacional (SQL) con restricciones referenciales en cascada y consultas de agregación optimizadas.
 * **Autenticación:** JSON Web Tokens (JWT) para gestión de sesiones de organizadores.
 * **DevOps:** Contenerización con Docker & Docker Compose; control de versiones en GitHub.
 
@@ -51,7 +51,7 @@ El sistema implementa una **Arquitectura Desacoplada (API REST + SPA)** con el p
 
 ---
 
-## ⚙️ 4. Reglas de Negocio Clave
+## 4. Reglas de Negocio Clave
 
 * **Tratamiento de Byes (Pase Libre):**
   * *Sin fase previa:* Asignación aleatoria por sorteo para completar la potencia de 2.
@@ -61,18 +61,14 @@ El sistema implementa una **Arquitectura Desacoplada (API REST + SPA)** con el p
 
 ---
 
-## 💻 5. Instalación y Ejecución Local
+## 5. Instalación y Ejecución Local
 
 Requisitos Previos:
 
   * Node.js (versión 18.x o superior)
-  * Docker Desktop & Docker Compose
   * Git
 
 ```bash
 # 1. Clonar el repositorio
 git clone [https://github.com/NaD3M-71/gestor-universal-torneos.git](https://github.com/NaD3M-71/gestor-universal-torneos.git)
 cd gestor-universal-torneos
-
-# 2. Levantar los contenedores
-docker-compose up --build -d
