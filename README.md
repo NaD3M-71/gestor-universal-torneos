@@ -10,6 +10,7 @@ Plataforma web liviana, flexible y parametrizable para la creación, administrac
 * **Daniela Romero** — Legajo N.º 234
 * **Giuliano Scaglioni** — Legajo N.º 5736
 * **Repositorio oficial:** [NaD3M-71/gestor-universal-torneos](https://github.com/NaD3M-71/gestor-universal-torneos)
+* **Información sobre el proyecto:** [Documentación](https://docs.google.com/document/d/1wcfEi0k6lRXvkXz3U1VIwWug3rMm2PTdA2qAD4PgT-Y/edit?usp=sharing)
 
 ---
 
