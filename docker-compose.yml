@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: gestor_torneos_backend
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - DATABASE_URL=${DATABASE_URL:}
+      - JWT_SECRET=tu_palabra_super_extra_mil_secreta
+    volumes:
+      # Refleja tus cambios de código en tiempo real sin reiniciar el contenedor
+      - ./backend/src:/app/src
+    restart: always
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: gestor_torneos_frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:3000/api
+    volumes:
+      # Refleja cambios en el frontend en tiempo real (Hot Reload)
+      - ./frontend/src:/app/src
+    depends_on:
+      - backend
+    restart: always
