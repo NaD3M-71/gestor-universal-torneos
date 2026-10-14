@@ -5,12 +5,12 @@
   "main": "server.ts",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "node --import tsx --watch src/server.ts",
+    "dev": "node --env-file-if-exists=../.env --import tsx --watch src/server.ts",
     "db:pull": "npx prisma db pull --schema=src/infrastructure/database/schema/schema.prisma",
     "db:generate": "npx prisma generate --schema=src/infrastructure/database/schema/schema.prisma",
-    "db:studio": "npx prisma studio --schema=src/infrastructure/database/schema/schema.prisma",
+    "db:studio": "npx prisma studio",
     "db:push": "npx prisma db push --schema=src/infrastructure/database/schema/schema.prisma",
-    "db:seed": "node --import tsx seeders/seed.ts"
+    "db:seed": "node --env-file-if-exists=../.env --import tsx seeders/seed.ts"
   },
   "keywords": [],
   "author": "",
