@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import app from './app';
-import { db } from './infrastructure/database/connection';
+import {prisma} from './infrastructure/database';
 
 const PORT = process.env.PORT;
 console.log(PORT);
@@ -8,12 +8,8 @@ console.log(PORT);
 async function bootstrap() {
   try {
     // Probar conexión a PostgreSQL
-    await db.authenticate();
-    console.log(' Conexión exitosa a PostgreSQL con Sequelize.');
-
-    // Sincronizar modelos
-    await db.sync({ alter: true });
-    console.log(' Modelos sincronizados correctamente.');
+    await prisma.$connect();
+    console.log(' Conexión exitosa a PostgreSQL con Prisma.');
 
     // Levantar el servidor Express
     app.listen(PORT, () => {

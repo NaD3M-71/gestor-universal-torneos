@@ -1,0 +1,169 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ------------------------------------------------------
+// ENUMS
+// ------------------------------------------------------
+
+enum EstadoTorneo {
+  borrador
+  en_curso
+  finalizado
+}
+
+enum FormatoTorneo {
+  liga_simple
+  liga_doble
+  eliminacion_simple
+  eliminacion_doble
+  liguilla_eliminacion
+  grupos_eliminatorias
+}
+
+enum SistemaPuntuacion {
+  ganada_perdida
+  futbol_clasico
+  sistema_alternativo
+}
+
+
+// ------------------------------------------------------
+//  USUARIO
+// ------------------------------------------------------
+model Usuario {
+  id          Int      @id @default(autoincrement())
+  nombre      String   @db.VarChar(100)
+  apellido    String?  @db.VarChar(100)
+  email       String   @unique @db.VarChar(150)
+  contrasenia String   @db.VarChar(255)
+
+  // Relaciones
+  torneosCreados Torneo[] @relation("TorneosCreados")
+
+  @@map("usuarios")   //Define el nombre físico de la tabla en la base de datos
+}
+
+// ------------------------------------------------------
+//  TORNEO
+// ------------------------------------------------------
+model Torneo {
+  id                   Int      @id @default(autoincrement())
+  creadorId            Int      @map("creador_id")
+  nombre               String   @db.VarChar(150)
+  descripcion          String?  @db.Text
+  formato              FormatoTorneo   
+  sistemaPuntuacion    SistemaPuntuacion   @map("sistema_puntuacion")  //@map mapea el nombre de la propiedad en TypeScript (camelCase) al nombre real en la tabla (snake_case).
+
+  cantidadParticipantes Int     @map("cantidad_participantes")
+  cantidadGrupos       Int?     @map("cantidad_grupos")
+  fechaInicio          DateTime? @map("fecha_inicio") @db.Date
+  estado EstadoTorneo @default(borrador)
+  campeonId            Int?     @map("campeon_id")
+
+  // Relaciones
+  creador   Usuario  @relation("TorneosCreados", fields: [creadorId], references: [id]) //fields: [creadorId] es la columna local en la tabla Torneo. references: [id] es la columna a la que apunta en la tabla Usuario.
+  campeon   Equipo?  @relation("TorneoCampeon", fields: [campeonId], references: [id])
+  fases     Fase[]   
+  equipos   Equipo[] @relation("EquiposTorneo")
+
+  @@map("torneos")
+}
+
+// ------------------------------------------------------
+//  FASE
+// ------------------------------------------------------
+model Fase {
+  id                  Int      @id @default(autoincrement())
+  torneoId            Int      @map("torneo_id")
+  tipo                String   @db.VarChar(50)
+  orden               Int
+  estado              String   @default("activa") @db.VarChar(20)
+  lineaDeCorte        Int?     @map("linea_de_corte")
+  idaYVuelta          Boolean  @default(false) @map("ida_y_vuelta")
+  comentarioDesempate String?  @map("comentario_desempate") @db.Text
+
+  // Relaciones
+  torneo          Torneo           @relation(fields: [torneoId], references: [id], onDelete: Cascade)
+  enfrentamientos Enfrentamiento[]
+
+  @@map("fases")
+}
+
+// ------------------------------------------------------
+//  EQUIPO
+// ------------------------------------------------------
+model Equipo {
+  id               Int     @id @default(autoincrement())
+  torneoId         Int     @map("torneo_id")
+  nombre           String  @db.VarChar(100)
+  grupo            Int?
+  ventajaDesempate Int     @default(0) @map("ventaja_desempate")
+
+  // Relaciones
+  torneo                 Torneo           @relation("EquiposTorneo", fields: [torneoId], references: [id], onDelete: Cascade)
+  torneosGanados         Torneo[]         @relation("TorneoCampeon")
+  integrantes            Integrante[]
+
+  enfrentamientosLocal   Enfrentamiento[] @relation("EquipoA")
+  enfrentamientosVisita  Enfrentamiento[] @relation("EquipoB")
+  enfrentamientosGanados Enfrentamiento[] @relation("EquipoGanador")
+
+  @@map("equipos")
+}
+
+// ------------------------------------------------------
+//  INTEGRANTE
+// ------------------------------------------------------
+model Integrante {
+  id       Int    @id @default(autoincrement())
+  equipoId Int    @map("equipo_id")
+  nombre   String @db.VarChar(100)
+
+  // Relaciones
+  equipo Equipo @relation(fields: [equipoId], references: [id], onDelete: Cascade)
+
+  @@map("integrantes")
+}
+
+// ------------------------------------------------------
+//  ENFRENTAMIENTO
+// ------------------------------------------------------
+model Enfrentamiento {
+  id          Int     @id @default(autoincrement())
+  faseId      Int     @map("fase_id")
+  equipoAId   Int?    @map("equipo_a_id")
+  equipoBId   Int?    @map("equipo_b_id")
+  resultadoA  Int?    @map("resultado_a")
+  resultadoB  Int?    @map("resultado_b")
+  instancia   String? @db.VarChar(50)
+  siguienteId Int?    @map("siguiente_id")
+  vueltaDeId  Int?    @map("vuelta_de_id")
+  ganadorId   Int?    @map("ganador_id")
+  comentario  String? @db.VarChar(255)
+
+  // Relaciones principales
+  fase    Fase    @relation(fields: [faseId], references: [id], onDelete: Cascade)
+  equipoA Equipo? @relation("EquipoA", fields: [equipoAId], references: [id])
+  equipoB Equipo? @relation("EquipoB", fields: [equipoBId], references: [id])
+  ganador Equipo? @relation("EquipoGanador", fields: [ganadorId], references: [id])
+
+  // Relaciones Autorreferenciales (Siguiente ronda y Partido de Ida/Vuelta)
+  siguienteEnfrentamiento Enfrentamiento?  @relation("SiguienteRonda", fields: [siguienteId], references: [id])
+  previosEnfrentamientos  Enfrentamiento[] @relation("SiguienteRonda")
+
+  vueltaDeEnfrentamiento  Enfrentamiento?  @relation("PartidoVuelta", fields: [vueltaDeId], references: [id])
+  vueltasEnfrentamiento Enfrentamiento[] @relation("PartidoVuelta")
+
+  @@map("enfrentamientos")
+}
