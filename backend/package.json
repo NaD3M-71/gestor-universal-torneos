@@ -4,8 +4,9 @@
   "description": "",
   "main": "server.ts",
   "scripts": {
+    "start": "node dist/server.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "node --env-file-if-exists=../.env --import tsx --watch src/server.ts",
+    "dev": "node --import tsx --watch src/server.ts",
     "db:pull": "npx prisma db pull --schema=src/infrastructure/database/schema/schema.prisma",
     "db:generate": "npx prisma generate --schema=src/infrastructure/database/schema/schema.prisma",
     "db:studio": "npx prisma studio",
