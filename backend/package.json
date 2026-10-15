@@ -4,13 +4,14 @@
   "description": "",
   "main": "server.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "node --env-file-if-exists=../.env --import tsx --watch src/server.ts",
     "db:pull": "npx prisma db pull --schema=src/infrastructure/database/schema/schema.prisma",
     "db:generate": "npx prisma generate --schema=src/infrastructure/database/schema/schema.prisma",
     "db:studio": "npx prisma studio",
     "db:push": "npx prisma db push --schema=src/infrastructure/database/schema/schema.prisma",
-    "db:seed": "node --env-file-if-exists=../.env --import tsx seeders/seed.ts"
+    "db:seed": "node --env-file-if-exists=../.env --import tsx seeders/seed.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "keywords": [],
   "author": "",
@@ -19,11 +20,11 @@
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
-    "prisma": "^7.8.0",
     "cors": "^2.8.6",
     "dotenv": "^18.0.7",
     "express": "^5.3.0",
-    "pg": "^8.22.0"
+    "pg": "^8.22.0",
+    "prisma": "^7.8.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
@@ -31,6 +32,7 @@
     "@types/node": "^26.6.5",
     "@types/pg": "^8.20.0",
     "tsx": "^4.23.15",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
   }
 }
