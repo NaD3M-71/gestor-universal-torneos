@@ -1,0 +1,19 @@
+{
+	"devDependencies": {
+		"husky": "^9.1.7",
+		"lint-staged": "^17.6.0"
+	},
+	"scripts": {
+		"prepare": "husky"
+	},
+	"lint-staged": {
+	  "backend/src/**/*.ts": [
+		"pnpm --filter backend exec eslint --fix",
+        "pnpm --filter backend exec prettier --write"
+    ],
+    "frontend/src/**/*.{ts,tsx}": [
+        "pnpm --filter frontend exec eslint --fix",
+        "pnpm --filter frontend exec prettier --write"
+    ]
+  }
+}
