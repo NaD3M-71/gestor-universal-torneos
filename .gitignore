@@ -2,3 +2,4 @@
 .DS_STORE
 .vscode/*
 logs
+node_modules

@@ -5,13 +5,16 @@
   "main": "server.ts",
   "scripts": {
     "start": "node dist/server.js",
-    "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "node --import tsx --watch src/server.ts",
     "db:pull": "npx prisma db pull --schema=src/infrastructure/database/schema/schema.prisma",
     "db:generate": "npx prisma generate --schema=src/infrastructure/database/schema/schema.prisma",
     "db:studio": "npx prisma studio",
     "db:push": "npx prisma db push --schema=src/infrastructure/database/schema/schema.prisma",
-    "db:seed": "node --env-file-if-exists=../.env --import tsx seeders/seed.ts"
+    "db:seed": "node --env-file-if-exists=../.env --import tsx seeders/seed.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint \"src/**/*.ts\"",
+    "format": "prettier --write \"src/**/*.ts\""
   },
   "keywords": [],
   "author": "",
@@ -20,18 +23,28 @@
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
-    "prisma": "^7.8.0",
     "cors": "^2.8.6",
     "dotenv": "^18.0.7",
     "express": "^5.3.0",
-    "pg": "^8.22.0"
+    "pg": "^8.22.0",
+    "prisma": "^7.8.0"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.7",
+    "@eslint/js": "^10.0.1",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^26.6.5",
     "@types/pg": "^8.20.0",
+    "@typescript-eslint/eslint-plugin": "^8.71.2",
+    "@typescript-eslint/parser": "^8.71.2",
+    "eslint": "^10.12.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.7",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.10",
     "tsx": "^4.23.15",
-    "typescript": "^7.0.2"
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.5"
   }
 }
