@@ -4,7 +4,8 @@
   "description": "",
   "main": "server.ts",
   "scripts": {
-    "dev": "node --env-file-if-exists=../.env --import tsx --watch src/server.ts",
+    "start": "node dist/server.js",
+    "dev": "node --import tsx --watch src/server.ts",
     "db:pull": "npx prisma db pull --schema=src/infrastructure/database/schema/schema.prisma",
     "db:generate": "npx prisma generate --schema=src/infrastructure/database/schema/schema.prisma",
     "db:studio": "npx prisma studio",
