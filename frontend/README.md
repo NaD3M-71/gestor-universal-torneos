@@ -1,75 +1,62 @@
-# React + TypeScript + Vite
+# Gestor Universal de Torneos - Frontend 🏆 
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Frontend desarrollado en **React** con **TypeScript**, **Vite** y **Tailwind CSS**, estructurado bajo una arquitectura modular por dominios (*feature-based*).
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Diseño y Paleta de Colores
 
-## React Compiler
+La interfaz sigue la identidad visual del proyecto integrada en Tailwind CSS:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+| Color | Hex | Uso Principal |
+| :--- | :--- | :--- |
+| **Grafito Oscuro** | `#212529` | Fondos oscuros, estructuras y textos principales |
+| **Azul Acero** | `#457B9D` | Bordes, acentos institucionales y elementos secundarios |
+| **Dorado Brillante** | `#E9C46A` | Títulos de jerarquía, coronas, destaques y llamadas a la acción |
+| **Verde Victoria** | `#2A9D8F` | Confirmaciones, victorias, inscripciones y éxito |
+| **Neutro Claro** | `#F8F9FA` | Fondos de tarjetas claras y modales |
+| **Alerta** | `#F4A261` | Partidos empatados y advertencias |
+| **Peligro** | `#E76F51` | Partidos perdidos, errores de validación y eliminaciones |
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Estructura de Carpetas (Architecture by Features)
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```text
+src/
+├── features/         # Módulos encapsulados por dominio
+│   ├── auth/         # Autenticación y control de sesión
+│   ├── tournaments/  # Creación, gestión y listado de torneos
+│   ├── matches/      # Fixtures, tablas de posiciones, brackets y cierres de fase
+│   └── public/       # Vista de solo lectura para espectadores
+├── shared/           # Recursos globales reutilizables
+│   ├── api/          # Cliente Axios configurado (`axiosClient.ts`)
+│   ├── components/   # Componentes UI globales (Layouts, Botones, Navbars)
+│   └── utils/        # Helper functions y formateadores
+├── App.tsx           # Enrutador principal y layout base
+├── index.css         # Importación de Tailwind CSS y tema global
+└── main.tsx          # Punto de entrada de la aplicación
 ```
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+## Configuración del Cliente HTTP (Axios & Mocks)
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+El cliente HTTP reside en src/shared/api/axiosClient.ts. Soporta cambio dinámico entre backend real y datos simulados locales mediante variables de entorno en .env:
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```text
+VITE_API_URL=http://localhost:4000/api
+VITE_USE_MOCKS=true
 ```
+
+## Comandos Principales
+
+### Instalar dependencias
+npm install
+
+### Levantar entorno de desarrollo
+npm run dev
+
+### Ejecutar tests
+npm test
+
+### Compilar para producción
+npm run build

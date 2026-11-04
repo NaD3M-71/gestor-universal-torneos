@@ -1,122 +1,82 @@
-import { useState } from "react";
-import heroImg from "./assets/hero.png";
-import reactLogo from "./assets/react.svg";
-import viteLogo from "./assets/vite.svg";
-import "./App.css";
+import { useEffect, useState } from 'react';
+import { axiosClient } from './shared/api/axiosClient';
 
-function App() {
-  const [count, setCount] = useState(0);
+export default function App() {
+  const [apiStatus, setApiStatus] = useState<string>('Probando conexión Axios...');
+  const [useMocks, setUseMocks] = useState<boolean>(false);
+
+  useEffect(() => {
+    // Verificamos si la variable de entorno para Mocks está activada
+    const isMockEnabled = import.meta.env.VITE_USE_MOCKS === 'true';
+    setUseMocks(isMockEnabled);
+
+    // Prueba simple con el cliente de Axios
+    axiosClient
+      .get('/')
+      .then((res) => {
+        setApiStatus(`Respuesta del servidor: ${res.status} OK`);
+      })
+      .catch((err) => {
+        // En esta etapa es normal que falle si el backend no está corriendo,
+        // pero valida que Axios intentó la llamada sin explotar.
+        setApiStatus(`Axios configurado (sin backend activo): ${err.message}`);
+      });
+  }, []);
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+    <div className="min-h-screen bg-grafito text-white flex flex-col items-center justify-center p-6">
+      {/* Tarjeta contenedora usando la paleta */}
+      <div className="bg-slate-800 border-2 border-azulAcero rounded-xl shadow-2xl p-8 max-w-lg w-full text-center">
+        
+        {/* Logo del proyecto */}
+        <div className="flex justify-center mb-4">
+          <img 
+            src="/logo-transparente.png" 
+            alt="Gestor Universal de Torneos Logo" 
+            className="w-32 h-32 object-contain drop-shadow-md"
+          />
         </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
+
+        <h1 className="text-3xl font-bold text-dorado mb-2">
+          Gestor Universal de Torneos
+        </h1>
+        <p className="text-gray-300 mb-6 text-sm">
+          Setup Inicial y Verificación de Entorno (Rama: <span className="text-azulAcero font-mono">feature/frontend-setup</span>)
+        </p>
+
+        {/* Sección de verificación de Tailwind */}
+        <div className="space-y-3 mb-6">
+          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
+            Prueba de Paleta Tailwind
+          </h2>
+          <div className="grid grid-cols-2 gap-2 text-xs font-semibold">
+            <div className="bg-grafito text-white p-3 rounded border border-gray-600">
+              Grafito Oscuro (#212529)
+            </div>
+            <div className="bg-azulAcero text-white p-3 rounded">
+              Azul Acero (#457B9D)
+            </div>
+            <div className="bg-dorado text-grafito p-3 rounded font-bold">
+              Dorado (#E9C46A)
+            </div>
+            <div className="bg-verdeVictoria text-white p-3 rounded">
+              Verde Victoria (#2A9D8F)
+            </div>
+          </div>
+        </div>
+
+        {/* Sección de verificación de Axios y Env Vars */}
+        <div className="bg-gray-900 p-4 rounded-lg text-left text-xs font-mono space-y-2 border border-gray-700">
+          <p className="text-gray-400">// Estado del Cliente HTTP (Axios):</p>
+          <p className="text-verdeVictoria">{apiStatus}</p>
+
+          <p className="text-gray-400 mt-2">// Modo de Datos (VITE_USE_MOCKS):</p>
+          <p className={useMocks ? 'text-dorado' : 'text-azulAcero'}>
+            {useMocks ? '✅ Mocks Activados (Local)' : '🌐 Modo API Real'}
           </p>
         </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
 
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+      </div>
+    </div>
   );
 }
-
-export default App;
