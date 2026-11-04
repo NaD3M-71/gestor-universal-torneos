@@ -42,8 +42,13 @@ if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
  *    - ¿Cuándo usarlo?: Inmediatamente después de hacer 'db pull' o si
  *      alguien del equipo modificó el schema y clonaste el repositorio.
  *
- * 3. npx prisma studio
+ * 3. npx prisma db push
+ *    - ¿Qué hace?: Aplica los cambios realizados manualmente en 'prisma/schema.prisma'
+ *      directamente sobre la base de datos (Supabase) sin crear archivos de migración SQL.
+ *    - ¿Cuándo usarlo?: Cuando edites el esquema localmente y quieras sincronizar
+ *      la base de datos rápidamente (ideal para prototipado o desarrollo).
+ *
+ * 4. npx prisma studio
  *    - ¿Qué hace?: Abre un panel visual interactivo en el navegador
  *      (http://localhost:5555) para ver, editar y crear datos localmente.
- *
  */
