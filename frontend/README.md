@@ -1,4 +1,4 @@
-# Gestor Universal de Torneos - Frontend 🏆 
+# Gestor Universal de Torneos - Frontend
 
 Frontend desarrollado en **React** con **TypeScript**, **Vite** y **Tailwind CSS**, estructurado bajo una arquitectura modular por dominios (*feature-based*).
 
@@ -38,14 +38,17 @@ src/
 └── main.tsx          # Punto de entrada de la aplicación
 ```
 
-## Configuración del Cliente HTTP (Axios & Mocks)
+## Configuración del Cliente HTTP (Axios)
 
-El cliente HTTP reside en src/shared/api/axiosClient.ts. Soporta cambio dinámico entre backend real y datos simulados locales mediante variables de entorno en .env:
+El cliente HTTP reside en `src/shared/api/axiosClient.ts` y es el único punto por el que el frontend llama a la API. Toma la URL base de la variable `VITE_API_URL` y envía las cookies en cada petición (`withCredentials`), necesario para la sesión con JWT en cookie httpOnly.
+
+La variable se define en el `.env` de la raíz del repositorio (el mismo que usa el backend; ver `.env.example`). Vite lo lee desde ahí gracias a `envDir` en `vite.config.ts`:
 
 ```text
-VITE_API_URL=http://localhost:4000/api
-VITE_USE_MOCKS=true
+VITE_API_URL=http://localhost:3000/api
 ```
+
+Si la variable no está definida, el cliente usa `http://localhost:3000/api`. Para que las cookies funcionen entre el frontend (puerto 5173) y el backend (puerto 3000), el CORS del backend debe permitir ese origen con credenciales.
 
 ## Comandos Principales
 

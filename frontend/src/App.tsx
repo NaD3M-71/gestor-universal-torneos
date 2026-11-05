@@ -1,18 +1,13 @@
 import { useEffect, useState } from 'react';
-import { axiosClient } from './shared/api/axiosClient';
+import { API_URL, axiosClient } from './shared/api/axiosClient';
 
 export default function App() {
   const [apiStatus, setApiStatus] = useState<string>('Probando conexión Axios...');
-  const [useMocks, setUseMocks] = useState<boolean>(false);
 
   useEffect(() => {
-    // Verificamos si la variable de entorno para Mocks está activada
-    const isMockEnabled = import.meta.env.VITE_USE_MOCKS === 'true';
-    setUseMocks(isMockEnabled);
-
-    // Prueba simple con el cliente de Axios
+    // Prueba simple con el cliente de Axios contra la ruta de salud del backend
     axiosClient
-      .get('/')
+      .get('/health')
       .then((res) => {
         setApiStatus(`Respuesta del servidor: ${res.status} OK`);
       })
@@ -70,10 +65,8 @@ export default function App() {
           <p className="text-gray-400">// Estado del Cliente HTTP (Axios):</p>
           <p className="text-verdeVictoria">{apiStatus}</p>
 
-          <p className="text-gray-400 mt-2">// Modo de Datos (VITE_USE_MOCKS):</p>
-          <p className={useMocks ? 'text-dorado' : 'text-azulAcero'}>
-            {useMocks ? '✅ Mocks Activados (Local)' : '🌐 Modo API Real'}
-          </p>
+          <p className="text-gray-400 mt-2">// URL base de la API (VITE_API_URL):</p>
+          <p className="text-azulAcero">{API_URL}</p>
         </div>
 
       </div>

@@ -1,21 +1,23 @@
-// Dejamos configurado el cliente base de Axios con la estructura lista para apuntar al backend o alternar con mocks locales
-
 import axios from 'axios';
 
+// Cliente HTTP único del frontend. Todas las llamadas a la API pasan por acá.
+// La URL base sale de VITE_API_URL (ver .env.example en la raíz del repo).
+// Si la variable no está definida, usa el backend local en el puerto 3000.
+export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+
 export const axiosClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:4000/api',
+  baseURL: API_URL,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true, 
+  // Necesario para que el navegador envíe y reciba la cookie httpOnly con el JWT.
+  withCredentials: true,
 });
 
-// Interceptor básico de errores o tokens opcional para más adelante
+// Punto único para manejar errores globales (por ejemplo, sesión vencida)
+// cuando se implemente la autenticación.
 axiosClient.interceptors.response.use(
   (response) => response,
-  (error) => {
-    // Manejo global de errores de red o autenticación
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
