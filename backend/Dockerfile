@@ -1,4 +1,3 @@
-Dockerfile
 # Usamos una imagen liviana oficial de Node.js 20 sobre Alpine Linux
 FROM node:20-alpine
 
