@@ -1,6 +1,6 @@
-import type { UsuarioPublico } from '../domain/usuarios/usuario';
-import { hashearContrasena } from '../infrastructure/auth/contrasena';
-import { crearUsuario } from '../infrastructure/repositories/usuario.repository';
+import type { UsuarioPublico } from '../../types/usuario';
+import { hashearContrasena } from './contrasena';
+import { crearUsuario } from '../../infrastructure/repositories/usuario.repository';
 
 export interface DatosRegistro {
   nombre: string;

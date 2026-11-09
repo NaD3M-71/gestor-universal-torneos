@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import { validationResult } from 'express-validator';
-import { ErrorValidacion } from '../errors/ErrorValidacion';
+import { ErrorValidacion } from './ErrorValidacion';
 
 /**
  * Va en la ruta justo después de las cadenas de validación. Si alguna falló,

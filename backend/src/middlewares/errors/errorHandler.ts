@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
-import { env } from '../config/env';
-import { AppError } from '../errors/AppError';
-import { ErrorValidacion } from '../errors/ErrorValidacion';
+import { env } from '../../config/env';
+import { AppError } from './AppError';
+import { ErrorValidacion } from './ErrorValidacion';
 
 /**
  * Se ejecuta cuando ninguna ruta respondió: genera un 404 y lo delega al

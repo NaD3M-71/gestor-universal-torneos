@@ -1,4 +1,4 @@
-//TODO check que es sequaize CLI
+//TODO Ver si pasamos estos archivos a DOCS
 
 
 // CLI (Command Line Interface o Interfaz de Línea de Comandos) 

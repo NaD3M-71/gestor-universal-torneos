@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { compare } from 'bcryptjs';
-import { registrarUsuario } from '../../src/application/registrarUsuario';
-import { crearUsuario } from '../../src/infrastructure/repositories/usuario.repository';
+import { registrarUsuario } from '../../../src/services/auth/registrarUsuario';
+import { crearUsuario } from '../../../src/infrastructure/repositories/usuario.repository';
 
 // Se reemplaza el repositorio para no necesitar una base de datos.
-vi.mock('../../src/infrastructure/repositories/usuario.repository', () => ({
+vi.mock('../../../src/infrastructure/repositories/usuario.repository', () => ({
   crearUsuario: vi.fn(),
 }));
 
