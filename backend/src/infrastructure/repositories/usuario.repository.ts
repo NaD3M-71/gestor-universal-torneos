@@ -1,8 +1,9 @@
-import { AppError } from '../../errors/AppError';
+import { AppError } from '../../middlewares/errors/AppError';
 import type {
   DatosNuevoUsuario,
+  UsuarioConContrasena,
   UsuarioPublico,
-} from '../../domain/usuarios/usuario';
+} from '../../types/usuario';
 import { prisma } from '../database';
 import { Prisma } from '../database/prisma/client';
 
@@ -37,4 +38,31 @@ export const crearUsuario = async (
     }
     throw error;
   }
+};
+
+/**
+ * Busca un usuario por email, con el hash de su contraseña, para el login.
+ * Devuelve null si no existe. El email se busca tal cual: el caso de uso ya
+ * lo normaliza (sin espacios y en minúsculas), igual que al registrarse.
+ */
+export const buscarPorEmail = async (
+  email: string
+): Promise<UsuarioConContrasena | null> => {
+  const usuario = await prisma.usuario.findUnique({
+    where: { email },
+    select: {
+      id: true,
+      nombre: true,
+      apellido: true,
+      email: true,
+      contrasenia: true,
+    },
+  });
+
+  if (usuario === null) {
+    return null;
+  }
+
+  const { contrasenia, ...datosPublicos } = usuario;
+  return { ...datosPublicos, contrasena: contrasenia };
 };

@@ -51,3 +51,24 @@ export const validarRegistro = [
       `La contraseña no puede superar los ${BYTES_MAXIMOS_CONTRASENA} caracteres.`
     ),
 ];
+
+/**
+ * Validaciones del cuerpo de POST /api/auth/login. Solo se exige que lleguen
+ * los dos datos: si no coinciden con un usuario, el caso de uso responde 401.
+ * No se aplican las reglas de largo del registro para no revelar cuáles son.
+ */
+export const validarLogin = [
+  body('email')
+    .isString()
+    .withMessage('El email es obligatorio.')
+    .bail()
+    .trim()
+    .notEmpty()
+    .withMessage('El email es obligatorio.'),
+  body('contrasena')
+    .isString()
+    .withMessage('La contraseña es obligatoria.')
+    .bail()
+    .notEmpty()
+    .withMessage('La contraseña es obligatoria.'),
+];

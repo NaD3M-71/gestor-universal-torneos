@@ -51,4 +51,5 @@ export const env = {
   NODE_ENV: leerEntorno(process.env.NODE_ENV),
   PORT: leerPuerto(process.env.PORT),
   DATABASE_URL: exigir('DATABASE_URL'),
+  JWT_SECRET: exigir('JWT_SECRET'),
 } as const;
