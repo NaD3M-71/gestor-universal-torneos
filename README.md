@@ -95,7 +95,7 @@ gestor-universal-torneos/
 ├── backend/             API REST (Node.js + Express + TypeScript + Prisma)
 │   ├── src/             Código fuente (ver sección 6.1)
 │   ├── seeders/         Datos de prueba
-│   ├── migrations/
+│   ├── migrations/      Scripts SQL de creación de la base de datos y las tablas
 │   └── tests/
 ├── frontend/            SPA (React + TypeScript + Vite)
 ├── docs/                Documentación del proyecto
@@ -143,7 +143,7 @@ Requisitos previos:
 * pnpm (backend) y npm o pnpm (frontend)
 * Git
 * Docker y Docker Compose (opcional)
-* Una base de datos accesible mediante la variable `DATABASE_URL`
+* PostgreSQL instalado en tu equipo (durante el desarrollo se usa una base local; Supabase se incorpora al final del proyecto)
 
 ### 7.1. Clonar el repositorio
 
@@ -152,9 +152,32 @@ git clone https://github.com/NaD3M-71/gestor-universal-torneos.git
 cd gestor-universal-torneos
 ```
 
-### 7.2. Ejecución con Docker Compose
+### 7.2. Base de datos local
 
-Definí las variables de entorno necesarias (por ejemplo en un archivo `.env` en la raíz) y levantá los servicios:
+Durante el desarrollo cada integrante usa una base PostgreSQL instalada en su propio equipo. Supabase se incorpora recién al final del proyecto; para ese cambio alcanza con modificar `DATABASE_URL`, porque el backend no necesita otra configuración.
+
+1. Crear una base vacía, por ejemplo `gestor_torneos` (desde pgAdmin, o con `createdb -U postgres gestor_torneos`).
+2. Copiar `.env.example` a `.env` en la raíz del repositorio y completar `DATABASE_URL` con tu usuario y contraseña:
+
+```text
+DATABASE_URL=postgresql://postgres:tu_contraseña@localhost:5432/gestor_torneos
+```
+
+3. Crear las tablas: con `pnpm db:push` (sección 7.4), o ejecutando a mano los scripts SQL de `backend/migrations/`: `01_crear_base.sql` (crea la base) y `02_crear_tablas.sql` (crea los tipos, las tablas y sus relaciones).
+
+### 7.3. Ejecución con Docker Compose
+
+Requiere la base local de la sección 7.2 ya creada y con las tablas cargadas. Las variables se toman del archivo `.env` de la raíz (`DATABASE_URL` y `JWT_SECRET`).
+
+Dentro de un contenedor, `localhost` es el propio contenedor y no tu equipo. Por eso, para usar Docker, el host de `DATABASE_URL` tiene que ser `host.docker.internal`:
+
+```text
+DATABASE_URL=postgresql://postgres:tu_contraseña@host.docker.internal:5432/gestor_torneos
+```
+
+PostgreSQL también tiene que aceptar conexiones que no vengan de `localhost` (parámetro `listen_addresses` en `postgresql.conf` y el acceso correspondiente en `pg_hba.conf`). Durante el desarrollo, la forma más simple de trabajar es la ejecución manual (sección 7.4).
+
+Levantar los servicios:
 
 ```bash
 docker compose up --build
@@ -163,9 +186,9 @@ docker compose up --build
 * Backend: http://localhost:3000
 * Frontend: http://localhost:5173
 
-### 7.3. Ejecución manual
+### 7.4. Ejecución manual
 
-Las variables de entorno se definen en un archivo `.env` en la raíz del repositorio, que se crea copiando `.env.example`. Las variables son `DATABASE_URL` (obligatoria), `PORT` (por defecto 3000) y `JWT_SECRET`.
+Las variables de entorno se definen en un archivo `.env` en la raíz del repositorio, que se crea copiando `.env.example`. Las variables son `DATABASE_URL` (obligatoria, apunta a la base local de la sección 7.2), `PORT` (por defecto 3000) y `JWT_SECRET`.
 
 ```bash
 cp .env.example .env
@@ -176,8 +199,11 @@ Backend:
 ```bash
 cd backend
 pnpm install
+pnpm db:push
 pnpm dev
 ```
+
+`pnpm db:push` crea en la base local las tablas definidas en el esquema de Prisma. Alcanza con ejecutarlo la primera vez y cada vez que cambie el esquema.
 
 Para comprobar que el servidor responde:
 
@@ -202,6 +228,7 @@ npm run dev
 | `pnpm build` | Compila TypeScript a la carpeta `dist/`. |
 | `pnpm start` | Ejecuta la versión compilada (`dist/server.js`). |
 | `pnpm typecheck` | Verifica los tipos sin generar archivos. |
+| `pnpm db:push` | Crea o actualiza las tablas de la base a partir del esquema de Prisma. |
 | `pnpm db:pull` | Actualiza el esquema de Prisma desde la base de datos. |
 | `pnpm db:generate` | Regenera el cliente de Prisma a partir del esquema. |
 | `pnpm db:studio` | Abre Prisma Studio para ver y editar datos. |

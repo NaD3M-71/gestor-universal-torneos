@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   backend:
     build:
@@ -10,8 +8,11 @@ services:
       - "3000:3000"
     environment:
       - PORT=3000
-      - DATABASE_URL=${DATABASE_URL:}
-      - JWT_SECRET=tu_palabra_super_extra_mil_secreta
+      - DATABASE_URL=${DATABASE_URL}
+      - JWT_SECRET=${JWT_SECRET}
+    extra_hosts:
+      # Permite usar host.docker.internal para llegar a la base instalada en tu equipo
+      - "host.docker.internal:host-gateway"
     volumes:
       # Refleja tus cambios de código en tiempo real sin reiniciar el contenedor
       - ./backend/src:/app/src
