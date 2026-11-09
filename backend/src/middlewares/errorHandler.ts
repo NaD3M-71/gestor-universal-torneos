@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import { env } from '../config/env';
 import { AppError } from '../errors/AppError';
+import { ErrorValidacion } from '../errors/ErrorValidacion';
 
 /**
  * Se ejecuta cuando ninguna ruta respondió: genera un 404 y lo delega al
@@ -32,10 +33,14 @@ export const errorHandler = (
 
   let statusCode = 500;
   let mensaje = 'Error interno del servidor.';
+  let detalles: ErrorValidacion['detalles'] | undefined;
 
   if (err instanceof AppError) {
     statusCode = err.statusCode;
     mensaje = err.message;
+    if (err instanceof ErrorValidacion) {
+      detalles = err.detalles;
+    }
   } else if (err instanceof SyntaxError && 'body' in err) {
     // express.json() lanza esto cuando el cuerpo no es un JSON válido.
     statusCode = 400;
@@ -51,6 +56,7 @@ export const errorHandler = (
   res.status(statusCode).json({
     error: {
       mensaje,
+      ...(detalles !== undefined && { detalles }),
       ...(stack !== undefined && { stack }),
     },
   });

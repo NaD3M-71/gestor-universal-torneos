@@ -44,9 +44,9 @@ CREATE TYPE "SistemaPuntuacion" AS ENUM (
 CREATE TABLE "usuarios" (
     "id" SERIAL NOT NULL,
     "nombre" VARCHAR(100) NOT NULL,
-    "apellido" VARCHAR(100) NOT NULL,
+    "apellido" VARCHAR(100),
     "email" VARCHAR(150) NOT NULL,
-    "contrasena" VARCHAR(255) NOT NULL,
+    "contrasenia" VARCHAR(255) NOT NULL,
 
     CONSTRAINT "usuarios_pkey" PRIMARY KEY ("id")
 );
