@@ -44,9 +44,9 @@ enum SistemaPuntuacion {
 model Usuario {
   id          Int      @id @default(autoincrement())
   nombre      String   @db.VarChar(100)
-  apellido    String   @db.VarChar(100)
+  apellido    String?  @db.VarChar(100)
   email       String   @unique @db.VarChar(150)
-  contrasena  String   @db.VarChar(255)
+  contrasenia String   @db.VarChar(255)
 
   // Relaciones
   torneosCreados Torneo[] @relation("TorneosCreados")

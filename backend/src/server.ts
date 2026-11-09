@@ -5,7 +5,10 @@ import { prisma } from './infrastructure/database';
 async function bootstrap() {
   try {
     // Probar conexión a PostgreSQL
-    await prisma.$connect();
+    // $connect() no abre ninguna conexión cuando se usa el adaptador de pg (el
+    // pool conecta recién en la primera consulta), así que se hace una consulta
+    // mínima para comprobar de verdad que la base responde.
+    await prisma.$queryRaw`SELECT 1`;
     console.log('Conexión exitosa a PostgreSQL con Prisma.');
 
     // Levantar el servidor Express
