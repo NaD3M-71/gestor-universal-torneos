@@ -1,12 +1,12 @@
 import { AppError } from '../../middlewares/errors/AppError';
 import type { UsuarioPublico } from '../../types/usuario';
 import { buscarPorEmail } from '../../infrastructure/repositories/usuario.repository';
-import { hashearContrasena, verificarContrasena } from './contrasena';
+import { hashearContrasenia, verificarContrasenia } from './contrasenia';
 import { generarToken } from './token';
 
 export interface DatosLogin {
   email: string;
-  contrasena: string;
+  contrasenia: string;
 }
 
 export interface ResultadoLogin {
@@ -22,7 +22,7 @@ const MENSAJE_CREDENCIALES_INVALIDAS = 'Email o contraseña incorrectos.';
 // vez, la primera vez que hace falta.
 let hashDeRelleno: Promise<string> | undefined;
 const obtenerHashDeRelleno = (): Promise<string> => {
-  hashDeRelleno ??= hashearContrasena('contrasena-de-relleno');
+  hashDeRelleno ??= hashearContrasenia('contrasenia-de-relleno');
   return hashDeRelleno;
 };
 
@@ -43,13 +43,13 @@ export const iniciarSesion = async (
   const encontrado = await buscarPorEmail(email);
 
   if (encontrado === null) {
-    await verificarContrasena(datos.contrasena, await obtenerHashDeRelleno());
+    await verificarContrasenia(datos.contrasenia, await obtenerHashDeRelleno());
     throw new AppError(MENSAJE_CREDENCIALES_INVALIDAS, 401);
   }
 
-  const { contrasena: hashGuardado, ...usuario } = encontrado;
+  const { contrasenia: hashGuardado, ...usuario } = encontrado;
 
-  if (!(await verificarContrasena(datos.contrasena, hashGuardado))) {
+  if (!(await verificarContrasenia(datos.contrasenia, hashGuardado))) {
     throw new AppError(MENSAJE_CREDENCIALES_INVALIDAS, 401);
   }
 

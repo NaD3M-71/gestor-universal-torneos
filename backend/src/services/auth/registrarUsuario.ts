@@ -1,12 +1,12 @@
 import type { UsuarioPublico } from '../../types/usuario';
-import { hashearContrasena } from './contrasena';
+import { hashearContrasenia } from './contrasenia';
 import { crearUsuario } from '../../infrastructure/repositories/usuario.repository';
 
 export interface DatosRegistro {
   nombre: string;
   apellido: string;
   email: string;
-  contrasena: string;
+  contrasenia: string;
 }
 
 /**
@@ -22,12 +22,12 @@ export interface DatosRegistro {
 export const registrarUsuario = async (
   datos: DatosRegistro
 ): Promise<UsuarioPublico> => {
-  const contrasenaHasheada = await hashearContrasena(datos.contrasena);
+  const contraseniaHasheada = await hashearContrasenia(datos.contrasenia);
 
   return crearUsuario({
     nombre: datos.nombre.trim(),
     apellido: datos.apellido.trim(),
     email: datos.email.trim().toLowerCase(),
-    contrasena: contrasenaHasheada,
+    contrasenia: contraseniaHasheada,
   });
 };
