@@ -17,13 +17,13 @@ vi.mock('../../../src/services/auth/token', () => ({
 const buscarPorEmailMock = vi.mocked(buscarPorEmail);
 const generarTokenMock = vi.mocked(generarToken);
 
-const CONTRASENA = 'unaclavelarga123';
+const contrasenia = 'unaclavelarga123';
 
 describe('iniciarSesion', () => {
   let hashGuardado: string;
 
   beforeEach(async () => {
-    hashGuardado = await hash(CONTRASENA, 4);
+    hashGuardado = await hash(contrasenia, 4);
     buscarPorEmailMock.mockReset();
     generarTokenMock.mockReset();
     generarTokenMock.mockReturnValue('token-de-prueba');
@@ -32,14 +32,14 @@ describe('iniciarSesion', () => {
       nombre: 'Valeria',
       apellido: 'Giménez',
       email: 'valeria@test.com',
-      contrasena: hashGuardado,
+      contrasenia: hashGuardado,
     });
   });
 
   it('con credenciales correctas devuelve el token y los datos públicos, sin la contraseña', async () => {
     const resultado = await iniciarSesion({
       email: 'valeria@test.com',
-      contrasena: CONTRASENA,
+      contrasenia: contrasenia,
     });
 
     expect(resultado.token).toBe('token-de-prueba');
@@ -49,14 +49,14 @@ describe('iniciarSesion', () => {
       apellido: 'Giménez',
       email: 'valeria@test.com',
     });
-    expect(resultado.usuario).not.toHaveProperty('contrasena');
+    expect(resultado.usuario).not.toHaveProperty('contrasenia');
     expect(generarTokenMock).toHaveBeenCalledWith(7);
   });
 
   it('busca el email sin espacios y en minúsculas', async () => {
     await iniciarSesion({
       email: '  Valeria@Test.COM ',
-      contrasena: CONTRASENA,
+      contrasenia: contrasenia,
     });
 
     expect(buscarPorEmailMock).toHaveBeenCalledWith('valeria@test.com');
@@ -65,7 +65,7 @@ describe('iniciarSesion', () => {
   it('con una contraseña incorrecta lanza 401 y no genera token', async () => {
     const promesa = iniciarSesion({
       email: 'valeria@test.com',
-      contrasena: 'otraclavecualquiera',
+      contrasenia: 'otraclavecualquiera',
     });
 
     await expect(promesa).rejects.toMatchObject({
@@ -80,7 +80,7 @@ describe('iniciarSesion', () => {
 
     const promesa = iniciarSesion({
       email: 'nadie@test.com',
-      contrasena: CONTRASENA,
+      contrasenia: contrasenia,
     });
 
     await expect(promesa).rejects.toBeInstanceOf(AppError);

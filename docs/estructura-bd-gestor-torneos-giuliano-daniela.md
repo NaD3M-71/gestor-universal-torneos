@@ -24,7 +24,7 @@ erDiagram
         string nombre
         string apellido
         string email
-        string contrasena
+        string contrasenia
     }
     TORNEO {
         int id PK
@@ -95,7 +95,7 @@ erDiagram
 | **nombre** | VARCHAR(100) | NOT NULL | Nombre del organizador para personalización de la interfaz y perfil. |
 | **apellido** | VARCHAR(100) | NOT NULL | Apellido del organizador. |
 | **email** | VARCHAR(150) | UNIQUE, NOT NULL | Credencial única de acceso (login) y canal de contacto/recuperación. |
-| **contrasena** | VARCHAR(255) | NOT NULL | Hash encriptado de la contraseña para validación segura de sesión vía JWT. |
+| **contrasenia** | VARCHAR(255) | NOT NULL | Hash encriptado de la contraseña para validación segura de sesión vía JWT. |
 
 ### 2. Entidad TORNEO
 

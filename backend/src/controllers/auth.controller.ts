@@ -24,13 +24,13 @@ const opcionesCookie: CookieOptions = {
  * la ruta. Si algo falla, Express 5 manda el error al manejador central.
  */
 export const registrar = async (req: Request, res: Response): Promise<void> => {
-  const { nombre, apellido, email, contrasena } = req.body;
+  const { nombre, apellido, email, contrasenia } = req.body;
 
   const usuario = await registrarUsuario({
     nombre,
     apellido,
     email,
-    contrasena,
+    contrasenia,
   });
 
   res.status(201).json({ usuario });
@@ -44,9 +44,9 @@ export const registrar = async (req: Request, res: Response): Promise<void> => {
  * credenciales incorrectas el caso de uso lanza un 401.
  */
 export const login = async (req: Request, res: Response): Promise<void> => {
-  const { email, contrasena } = req.body;
+  const { email, contrasenia } = req.body;
 
-  const { usuario, token } = await iniciarSesion({ email, contrasena });
+  const { usuario, token } = await iniciarSesion({ email, contrasenia });
 
   res.cookie(NOMBRE_COOKIE_SESION, token, {
     ...opcionesCookie,

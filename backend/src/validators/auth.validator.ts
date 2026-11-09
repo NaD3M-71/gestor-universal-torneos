@@ -2,9 +2,9 @@ import { body } from 'express-validator';
 
 const LARGO_MAXIMO_NOMBRE = 100;
 const LARGO_MAXIMO_EMAIL = 150;
-const LARGO_MINIMO_CONTRASENA = 8;
+const LARGO_MINIMO_CONTRASENIA = 8;
 // bcrypt solo usa los primeros 72 bytes de la contraseña.
-const BYTES_MAXIMOS_CONTRASENA = 72;
+const BYTES_MAXIMOS_CONTRASENIA = 72;
 
 /** Campo de texto obligatorio, sin espacios sobrantes y con largo máximo. */
 const textoObligatorio = (campo: string, etiqueta: string, maximo: number) =>
@@ -37,18 +37,18 @@ export const validarRegistro = [
       `El email no puede superar los ${LARGO_MAXIMO_EMAIL} caracteres.`
     ),
   // La contraseña no se recorta: los espacios forman parte de ella.
-  body('contrasena')
+  body('contrasenia')
     .isString()
     .withMessage('La contraseña es obligatoria.')
     .bail()
-    .isLength({ min: LARGO_MINIMO_CONTRASENA })
+    .isLength({ min: LARGO_MINIMO_CONTRASENIA })
     .withMessage(
-      `La contraseña debe tener al menos ${LARGO_MINIMO_CONTRASENA} caracteres.`
+      `La contraseña debe tener al menos ${LARGO_MINIMO_CONTRASENIA} caracteres.`
     )
     .bail()
-    .isByteLength({ max: BYTES_MAXIMOS_CONTRASENA })
+    .isByteLength({ max: BYTES_MAXIMOS_CONTRASENIA })
     .withMessage(
-      `La contraseña no puede superar los ${BYTES_MAXIMOS_CONTRASENA} caracteres.`
+      `La contraseña no puede superar los ${BYTES_MAXIMOS_CONTRASENIA} caracteres.`
     ),
 ];
 
@@ -65,7 +65,7 @@ export const validarLogin = [
     .trim()
     .notEmpty()
     .withMessage('El email es obligatorio.'),
-  body('contrasena')
+  body('contrasenia')
     .isString()
     .withMessage('La contraseña es obligatoria.')
     .bail()

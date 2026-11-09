@@ -17,13 +17,13 @@ export interface DatosNuevoUsuario {
   nombre: string;
   apellido: string;
   email: string;
-  contrasena: string;
+  contrasenia: string;
 }
 
 /**
  * Usuario junto con el hash de su contraseña. Solo lo usa el login para
  * comparar la contraseña; nunca debe salir de la capa de servicios.
  */
-export interface UsuarioConContrasena extends UsuarioPublico {
-  contrasena: string;
+export interface UsuarioConContrasenia extends UsuarioPublico {
+  contrasenia: string;
 }

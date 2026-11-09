@@ -1,7 +1,7 @@
 import { AppError } from '../../middlewares/errors/AppError';
 import type {
   DatosNuevoUsuario,
-  UsuarioConContrasena,
+  UsuarioConContrasenia,
   UsuarioPublico,
 } from '../../types/usuario';
 import { prisma } from '../database';
@@ -24,8 +24,7 @@ export const crearUsuario = async (
         nombre: datos.nombre,
         apellido: datos.apellido,
         email: datos.email,
-        // En la base la columna se llama contrasenia.
-        contrasenia: datos.contrasena,
+        contrasenia: datos.contrasenia,
       },
       select: { id: true, nombre: true, apellido: true, email: true },
     });
@@ -45,10 +44,10 @@ export const crearUsuario = async (
  * Devuelve null si no existe. El email se busca tal cual: el caso de uso ya
  * lo normaliza (sin espacios y en minúsculas), igual que al registrarse.
  */
-export const buscarPorEmail = async (
+export const buscarPorEmail = (
   email: string
-): Promise<UsuarioConContrasena | null> => {
-  const usuario = await prisma.usuario.findUnique({
+): Promise<UsuarioConContrasenia | null> =>
+  prisma.usuario.findUnique({
     where: { email },
     select: {
       id: true,
@@ -58,11 +57,3 @@ export const buscarPorEmail = async (
       contrasenia: true,
     },
   });
-
-  if (usuario === null) {
-    return null;
-  }
-
-  const { contrasenia, ...datosPublicos } = usuario;
-  return { ...datosPublicos, contrasena: contrasenia };
-};

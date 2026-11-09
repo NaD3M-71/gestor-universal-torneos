@@ -14,7 +14,7 @@ const datos = {
   nombre: '  Valeria ',
   apellido: ' Giménez  ',
   email: '  Valeria@Test.COM ',
-  contrasena: 'unaclavelarga123',
+  contrasenia: 'unaclavelarga123',
 };
 
 describe('registrarUsuario', () => {
@@ -41,8 +41,8 @@ describe('registrarUsuario', () => {
     await registrarUsuario(datos);
 
     const guardado = crearUsuarioMock.mock.calls[0]![0];
-    expect(guardado.contrasena).not.toBe(datos.contrasena);
-    expect(await compare(datos.contrasena, guardado.contrasena)).toBe(true);
+    expect(guardado.contrasenia).not.toBe(datos.contrasenia);
+    expect(await compare(datos.contrasenia, guardado.contrasenia)).toBe(true);
   });
 
   it('devuelve los datos públicos que entrega el repositorio', async () => {
@@ -54,7 +54,7 @@ describe('registrarUsuario', () => {
       apellido: 'Giménez',
       email: 'valeria@test.com',
     });
-    expect(usuario).not.toHaveProperty('contrasena');
+    expect(usuario).not.toHaveProperty('contrasenia');
   });
 
   it('deja pasar el error del repositorio cuando el email ya existe', async () => {
