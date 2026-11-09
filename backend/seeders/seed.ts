@@ -19,7 +19,7 @@ async function main() {
       nombre: 'Valeria',
       apellido: 'Giménez',
       email: 'valeria.organizador@test.com',
-      contrasenia: '$2b$10$FakeHashedPasswordForTesting123', // Simulando un hash 
+      contrasena: '$2b$10$FakeHashedPasswordForTesting123', // Simulando un hash 
     },
   });
 
