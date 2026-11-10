@@ -1,13 +1,15 @@
 import type { CookieOptions, Request, Response } from 'express';
-import { iniciarSesion } from '../services/auth/iniciarSesion';
-import { registrarUsuario } from '../services/auth/registrarUsuario';
-import { obtenerUsuarioActual } from '../services/auth/obtenerUsuarioActual';
+import {
+  iniciarSesion,
+  obtenerUsuarioActual,
+  registrarUsuario,
+} from '@services/auth/auth.service';
 import { AppError } from '../middlewares/errors/AppError';
 import { env } from '../config/env';
 import {
   DURACION_SESION_SEGUNDOS,
   NOMBRE_COOKIE_SESION,
-} from '../services/auth/token';
+} from '@services/auth/token';
 
 // httpOnly: el JavaScript del navegador no puede leer la cookie (protege el
 // token de un ataque XSS). sameSite 'lax': no se envía en peticiones que otros
