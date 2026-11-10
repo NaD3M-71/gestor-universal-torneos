@@ -2,7 +2,7 @@ import type {
   EstadoTorneo,
   FormatoTorneo,
   SistemaPuntuacion,
-} from '../infrastructure/database/prisma/enums';
+} from '@prisma/enums';
 
 /**
  * Datos públicos de un torneo tal como se devuelven a la API o al cliente.

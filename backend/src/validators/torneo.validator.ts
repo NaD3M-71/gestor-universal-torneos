@@ -1,8 +1,5 @@
 import { body, param } from 'express-validator';
-import {
-  FormatoTorneo,
-  SistemaPuntuacion,
-} from '../infrastructure/database/prisma/enums';
+import { FormatoTorneo, SistemaPuntuacion } from '@prisma/enums';
 
 const LARGO_MAXIMO_NOMBRE = 150;
 const MINIMO_PARTICIPANTES = 2;
