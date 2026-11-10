@@ -46,7 +46,7 @@ export function useAuthForm(tipo: TipoFormulario) {
         await login(data as CredencialesLogin);
       }
 
-      navigate("/");
+      navigate("/torneos");
     } catch (err: unknown) {
       const mensajeDefecto =
         tipo === "login" ? "Error al iniciar sesión." : "Error al registrarse.";

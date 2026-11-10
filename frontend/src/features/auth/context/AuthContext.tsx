@@ -23,9 +23,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Llama al endpoint del usuario actual
         const usuarioData = await authService.getCurrentUser();
         setUser(usuarioData);
-      } finally {
-        // Si la cookie no existe o expiró, el backend responderá con error y dejamos el usuario en null
+      } catch {
+        // Si la cookie no existe, expiró o hubo un error, dejamos el usuario en null
         setUser(null);
+      } finally {
+        // El setIsLoading se ejecuta al terminar, sin importar si salió bien o mal
         setIsLoading(false);
       }
     };
