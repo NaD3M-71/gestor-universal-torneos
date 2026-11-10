@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { obtenerEstado } from '../controllers/health.controller';
 
-const router = Router();
+const router: Router = Router();
 
 router.get('/', obtenerEstado);
 

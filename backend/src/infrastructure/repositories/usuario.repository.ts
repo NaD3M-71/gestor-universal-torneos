@@ -65,3 +65,12 @@ export const buscarPorEmail = async (
   const { contrasenia, ...datosPublicos } = usuario;
   return { ...datosPublicos, contrasenia: contrasenia };
 };
+/**
+ * Busca un usuario por id y devuelve sus datos públicos (sin contraseña).
+ * Devuelve null si no existe.
+ */
+export const buscarPorId = (id: number): Promise<UsuarioPublico | null> =>
+  prisma.usuario.findUnique({
+    where: { id },
+    select: { id: true, nombre: true, apellido: true, email: true },
+  });

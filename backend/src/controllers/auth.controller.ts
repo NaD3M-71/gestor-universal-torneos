@@ -1,10 +1,13 @@
 import type { CookieOptions, Request, Response } from 'express';
 import { iniciarSesion } from '../services/auth/iniciarSesion';
 import { registrarUsuario } from '../services/auth/registrarUsuario';
+import { obtenerUsuarioActual } from '../services/auth/obtenerUsuarioActual';
+import { AppError } from '../middlewares/errors/AppError';
 import { env } from '../config/env';
-import { DURACION_SESION_SEGUNDOS } from '../services/auth/token';
-
-const NOMBRE_COOKIE_SESION = 'token';
+import {
+  DURACION_SESION_SEGUNDOS,
+  NOMBRE_COOKIE_SESION,
+} from '../services/auth/token';
 
 // httpOnly: el JavaScript del navegador no puede leer la cookie (protege el
 // token de un ataque XSS). sameSite 'lax': no se envía en peticiones que otros
@@ -63,4 +66,22 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 export const logout = (_req: Request, res: Response): void => {
   res.clearCookie(NOMBRE_COOKIE_SESION, opcionesCookie);
   res.status(204).end();
+};
+
+/**
+ * GET /api/auth/yo
+ * Devuelve los datos públicos del organizador con la sesión iniciada. El id
+ * lo carga el middleware autenticar; si por algún motivo falta, es un 401.
+ */
+export const usuarioActual = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  if (req.usuarioId === undefined) {
+    throw new AppError('Necesitás iniciar sesión.', 401);
+  }
+
+  const usuario = await obtenerUsuarioActual(req.usuarioId);
+
+  res.status(200).json({ usuario });
 };
