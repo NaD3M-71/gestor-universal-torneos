@@ -5,7 +5,7 @@
 export interface UsuarioPublico {
   id: number;
   nombre: string;
-  apellido: string;
+  apellido: string | null;
   email: string;
 }
 
