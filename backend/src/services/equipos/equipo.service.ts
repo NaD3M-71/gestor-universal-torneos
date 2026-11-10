@@ -1,8 +1,14 @@
-import { EstadoTorneo } from '@prisma/enums';
+import { randomInt } from 'node:crypto';
+import { EstadoTorneo, FormatoTorneo } from '@prisma/enums';
 import * as equipoRepository from '@repositories/equipo.repository';
 import { obtenerTorneo } from '@services/torneos/torneo.service';
 import { AppError } from '../../middlewares/errors/AppError';
+import {
+  ErrorValidacion,
+  type DetalleValidacion,
+} from '../../middlewares/errors/ErrorValidacion';
 import type {
+  AsignacionGrupo,
   DatosActualizarEquipo,
   DatosNuevoEquipo,
   EquipoPublico,
@@ -85,6 +91,11 @@ export const crearEquipo = async (
 
   await exigirNombreLibre(torneoId, nombre);
 
+  // TODO(deuda técnica): el cupo y el nombre repetido se comprueban antes de
+  // guardar, pero sin una operación atómica ni un índice único en la base
+  // (torneo_id, lower(nombre)). Dos altas simultáneas podrían repetir un nombre
+  // o pasarse del cupo. Hoy se evita deshabilitando el botón de alta en el
+  // frontend (tarjeta 2.7).
   return equipoRepository.crearEquipo(torneoId, {
     nombre,
     integrantes: normalizarIntegrantes(datos.integrantes ?? []),
@@ -139,4 +150,104 @@ export const eliminarEquipo = async (
   await buscarEquipoDelTorneo(torneoId, equipoId);
 
   await equipoRepository.eliminarEquipo(equipoId);
+};
+
+/**
+ * Cantidad de grupos de un torneo en borrador que usa grupos. Los grupos solo
+ * existen en el formato grupos_eliminatorias.
+ */
+const buscarCantidadDeGrupos = async (
+  torneoId: number,
+  usuarioId: number
+): Promise<number> => {
+  const torneo = await buscarTorneoEditable(torneoId, usuarioId);
+
+  if (
+    torneo.formato !== FormatoTorneo.grupos_eliminatorias ||
+    torneo.cantidadGrupos === null
+  ) {
+    throw new AppError(
+      'Los grupos solo aplican a torneos con formato grupos_eliminatorias.',
+      409
+    );
+  }
+
+  return torneo.cantidadGrupos;
+};
+
+/**
+ * Asigna los grupos de todo el torneo de una vez. La lista reemplaza a la
+ * anterior: los equipos que no figuren o lleguen con grupo null quedan sin
+ * grupo. No hay tope de equipos por grupo (el reparto es libre). Devuelve 400
+ * con un detalle por asignación si un equipo no es del torneo, se repite o el
+ * grupo supera la cantidad de grupos del torneo.
+ */
+export const asignarGrupos = async (
+  torneoId: number,
+  usuarioId: number,
+  asignaciones: AsignacionGrupo[]
+): Promise<EquipoPublico[]> => {
+  const cantidadGrupos = await buscarCantidadDeGrupos(torneoId, usuarioId);
+  const equipos = await equipoRepository.listarEquiposDeTorneo(torneoId);
+  const idsDelTorneo = new Set(equipos.map((equipo) => equipo.id));
+  const vistos = new Set<number>();
+  const detalles: DetalleValidacion[] = [];
+
+  asignaciones.forEach(({ equipoId, grupo }, indice) => {
+    if (!idsDelTorneo.has(equipoId)) {
+      detalles.push({
+        campo: `asignaciones[${indice}].equipoId`,
+        mensaje: 'El equipo no pertenece al torneo.',
+      });
+    } else if (vistos.has(equipoId)) {
+      detalles.push({
+        campo: `asignaciones[${indice}].equipoId`,
+        mensaje: 'El equipo está repetido en la lista.',
+      });
+    }
+    vistos.add(equipoId);
+
+    if (grupo !== null && grupo > cantidadGrupos) {
+      detalles.push({
+        campo: `asignaciones[${indice}].grupo`,
+        mensaje: `El torneo tiene ${cantidadGrupos} grupos: el grupo debe estar entre 1 y ${cantidadGrupos}.`,
+      });
+    }
+  });
+
+  if (detalles.length > 0) {
+    throw new ErrorValidacion(detalles);
+  }
+
+  return equipoRepository.reemplazarGrupos(torneoId, asignaciones);
+};
+
+/** Mezcla una lista al azar (Fisher-Yates) sin modificar la original. */
+const mezclar = <T>(lista: T[]): T[] => {
+  const copia = [...lista];
+  for (let i = copia.length - 1; i > 0; i--) {
+    const j = randomInt(i + 1);
+    [copia[i], copia[j]] = [copia[j] as T, copia[i] as T];
+  }
+  return copia;
+};
+
+/**
+ * Sorteo: reparte al azar todos los equipos inscriptos entre los grupos del
+ * torneo, en forma pareja (los grupos difieren como mucho en un equipo).
+ * Reemplaza cualquier asignación anterior.
+ */
+export const sortearGrupos = async (
+  torneoId: number,
+  usuarioId: number
+): Promise<EquipoPublico[]> => {
+  const cantidadGrupos = await buscarCantidadDeGrupos(torneoId, usuarioId);
+  const equipos = await equipoRepository.listarEquiposDeTorneo(torneoId);
+
+  const asignaciones = mezclar(equipos).map((equipo, indice) => ({
+    equipoId: equipo.id,
+    grupo: (indice % cantidadGrupos) + 1,
+  }));
+
+  return equipoRepository.reemplazarGrupos(torneoId, asignaciones);
 };

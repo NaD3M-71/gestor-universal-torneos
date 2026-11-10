@@ -60,3 +60,24 @@ export const validarEquipoDeLaRuta = [
   ...validarTorneoDeLaRuta,
   param('id').isInt({ min: 1 }).withMessage('El id del equipo no es válido.'),
 ];
+
+/**
+ * Validaciones del cuerpo de PUT /api/torneos/:torneoId/grupos: una lista de
+ * { equipoId, grupo }. El tope superior del grupo depende del torneo, así que
+ * se controla en el servicio.
+ */
+export const validarAsignacionGrupos = [
+  body('asignaciones')
+    .isArray()
+    .withMessage('Las asignaciones deben enviarse como una lista.'),
+  body('asignaciones.*.equipoId')
+    .isInt({ min: 1 })
+    .withMessage('El id del equipo no es válido.'),
+  body('asignaciones.*.grupo')
+    .custom(
+      (grupo) => grupo === null || (Number.isInteger(grupo) && grupo >= 1)
+    )
+    .withMessage(
+      'El grupo debe ser un entero desde 1, o null para dejar al equipo sin grupo.'
+    ),
+];

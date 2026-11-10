@@ -5,13 +5,15 @@ export interface IntegrantePublico {
 }
 
 /**
- * Datos públicos de un equipo, con sus integrantes. No incluye el grupo ni la
- * ventaja de desempate: los maneja la lógica del torneo en curso.
+ * Datos públicos de un equipo, con sus integrantes. El grupo es null mientras
+ * no se asigne (o si el torneo no usa grupos). No incluye la ventaja de
+ * desempate: la maneja la lógica del torneo en curso.
  */
 export interface EquipoPublico {
   id: number;
   torneoId: number;
   nombre: string;
+  grupo: number | null;
   integrantes: IntegrantePublico[];
 }
 
@@ -31,4 +33,10 @@ export interface DatosNuevoEquipo {
 export interface DatosActualizarEquipo {
   nombre?: string;
   integrantes?: string[];
+}
+
+/** Grupo (1..cantidadGrupos) de un equipo; null lo deja sin grupo. */
+export interface AsignacionGrupo {
+  equipoId: number;
+  grupo: number | null;
 }

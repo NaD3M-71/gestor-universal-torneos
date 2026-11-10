@@ -1,12 +1,14 @@
 import type { Request, Response } from 'express';
 import {
   actualizarEquipo,
+  asignarGrupos,
   crearEquipo,
   eliminarEquipo,
   listarEquipos,
+  sortearGrupos,
 } from '@services/equipos/equipo.service';
 import { AppError } from '../middlewares/errors/AppError';
-import type { DatosActualizarEquipo } from '../types/equipo';
+import type { AsignacionGrupo, DatosActualizarEquipo } from '../types/equipo';
 
 // Campos que el organizador puede modificar de un equipo.
 const CAMPOS_EDITABLES = ['nombre', 'integrantes'] as const;
@@ -74,4 +76,35 @@ export const eliminar = async (req: Request, res: Response): Promise<void> => {
   await eliminarEquipo(torneoIdDe(req), equipoIdDe(req), usuarioIdDe(req));
 
   res.status(204).end();
+};
+
+/**
+ * PUT /api/torneos/:torneoId/grupos
+ * Reemplaza la asignación de grupos de todo el torneo.
+ */
+export const asignarGruposDelTorneo = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  const asignaciones = (req.body.asignaciones as AsignacionGrupo[]).map(
+    ({ equipoId, grupo }) => ({ equipoId: Number(equipoId), grupo })
+  );
+
+  const equipos = await asignarGrupos(
+    torneoIdDe(req),
+    usuarioIdDe(req),
+    asignaciones
+  );
+
+  res.status(200).json({ equipos });
+};
+
+/** POST /api/torneos/:torneoId/grupos/sorteo: reparte los equipos al azar. */
+export const sortearGruposDelTorneo = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  const equipos = await sortearGrupos(torneoIdDe(req), usuarioIdDe(req));
+
+  res.status(200).json({ equipos });
 };

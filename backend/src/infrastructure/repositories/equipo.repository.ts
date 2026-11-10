@@ -1,4 +1,5 @@
 import type {
+  AsignacionGrupo,
   DatosActualizarEquipo,
   DatosNuevoEquipo,
   EquipoPublico,
@@ -10,6 +11,7 @@ const seleccionEquipo = {
   id: true,
   torneoId: true,
   nombre: true,
+  grupo: true,
   integrantes: { select: { id: true, nombre: true }, orderBy: { id: 'asc' } },
 } as const;
 
@@ -93,4 +95,36 @@ export const existeEquipoConNombre = async (
   });
 
   return equipo !== null;
+};
+
+/**
+ * Reemplaza los grupos de todos los equipos del torneo en una sola transacción:
+ * primero los deja sin grupo y después aplica los indicados. Devuelve los
+ * equipos ya actualizados.
+ */
+export const reemplazarGrupos = async (
+  torneoId: number,
+  asignaciones: AsignacionGrupo[]
+): Promise<EquipoPublico[]> => {
+  await prisma.$transaction([
+    prisma.equipo.updateMany({ where: { torneoId }, data: { grupo: null } }),
+    ...asignaciones
+      .filter(({ grupo }) => grupo !== null)
+      .map(({ equipoId, grupo }) =>
+        prisma.equipo.updateMany({
+          where: { id: equipoId, torneoId },
+          data: { grupo },
+        })
+      ),
+  ]);
+
+  return listarEquiposDeTorneo(torneoId);
+};
+
+/** Deja sin grupo a todos los equipos del torneo. */
+export const limpiarGrupos = async (torneoId: number): Promise<void> => {
+  await prisma.equipo.updateMany({
+    where: { torneoId },
+    data: { grupo: null },
+  });
 };

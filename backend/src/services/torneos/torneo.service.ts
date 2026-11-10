@@ -131,6 +131,7 @@ export const obtenerTorneo = (
  * Edita un torneo en borrador. Los cambios son parciales: la configuración se
  * valida completa, combinando lo recibido con lo ya guardado. Si el formato
  * deja de ser grupos_eliminatorias y no se indican grupos, se limpian solos.
+ * Cambiar la cantidad de grupos descarta los grupos asignados a los equipos.
  */
 export const actualizarTorneo = async (
   id: number,
@@ -163,6 +164,12 @@ export const actualizarTorneo = async (
         409
       );
     }
+  }
+
+  // Si cambia la cantidad de grupos (o el formato deja de usarlos), los grupos
+  // ya asignados dejan de ser válidos y se descartan.
+  if (cantidadGrupos !== actual.cantidadGrupos) {
+    await equipoRepository.limpiarGrupos(id);
   }
 
   const datos: DatosActualizarTorneo = { ...cambios, cantidadGrupos };
