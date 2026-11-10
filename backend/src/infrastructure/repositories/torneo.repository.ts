@@ -40,11 +40,3 @@ export const actualizarTorneo = (
 export const eliminarTorneo = async (id: number): Promise<void> => {
   await prisma.torneo.delete({ where: { id } });
 };
-
-/**
- * Cantidad de equipos ya inscriptos en un torneo. Lo usa la edición para no
- * dejar que cantidadParticipantes quede por debajo de los equipos cargados.
- * Cuando se haga la 2.3 puede pasar al repositorio de equipos.
- */
-export const contarEquiposDeTorneo = (torneoId: number): Promise<number> =>
-  prisma.equipo.count({ where: { torneoId } });

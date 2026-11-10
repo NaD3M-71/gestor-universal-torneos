@@ -8,6 +8,7 @@ import {
 } from '@controllers/torneo.controller';
 import { autenticar } from '../middlewares/autenticar';
 import { handleInputErrors } from '../middlewares/errors/handleInputErrors';
+import equipoRoutes from './equipo.routes';
 import {
   validarAltaTorneo,
   validarEdicionTorneo,
@@ -18,6 +19,9 @@ const router: Router = Router();
 
 // Todas las rutas de torneos exigen sesión iniciada.
 router.use(autenticar);
+
+// Equipos e integrantes cuelgan del torneo: /api/torneos/:torneoId/equipos
+router.use('/:torneoId/equipos', equipoRoutes);
 
 router.post('/', validarAltaTorneo, handleInputErrors, crear);
 router.get('/', listar);

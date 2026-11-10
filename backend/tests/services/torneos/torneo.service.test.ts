@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import * as equipoRepository from '@repositories/equipo.repository';
 import * as torneoRepository from '@repositories/torneo.repository';
 import {
   actualizarTorneo,
@@ -12,14 +13,16 @@ import {
 import type { ErrorValidacion } from '../../../src/middlewares/errors/ErrorValidacion';
 import type { TorneoPublico } from '../../../src/types/torneo';
 
-// Se reemplaza el repositorio para no necesitar una base de datos.
+// Se reemplazan los repositorios para no necesitar una base de datos.
+vi.mock('@repositories/equipo.repository', () => ({
+  contarEquiposDeTorneo: vi.fn(),
+}));
 vi.mock('@repositories/torneo.repository', () => ({
   crearTorneo: vi.fn(),
   listarTorneosDeCreador: vi.fn(),
   buscarTorneoPorId: vi.fn(),
   actualizarTorneo: vi.fn(),
   eliminarTorneo: vi.fn(),
-  contarEquiposDeTorneo: vi.fn(),
 }));
 
 const crearMock = vi.mocked(torneoRepository.crearTorneo);
@@ -27,7 +30,7 @@ const listarMock = vi.mocked(torneoRepository.listarTorneosDeCreador);
 const buscarMock = vi.mocked(torneoRepository.buscarTorneoPorId);
 const actualizarMock = vi.mocked(torneoRepository.actualizarTorneo);
 const eliminarMock = vi.mocked(torneoRepository.eliminarTorneo);
-const contarEquiposMock = vi.mocked(torneoRepository.contarEquiposDeTorneo);
+const contarEquiposMock = vi.mocked(equipoRepository.contarEquiposDeTorneo);
 
 const USUARIO_ID = 7;
 

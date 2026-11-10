@@ -1,4 +1,5 @@
 import { EstadoTorneo, FormatoTorneo } from '@prisma/enums';
+import * as equipoRepository from '@repositories/equipo.repository';
 import * as torneoRepository from '@repositories/torneo.repository';
 import type {
   DatosActualizarTorneo,
@@ -155,7 +156,7 @@ export const actualizarTorneo = async (
   validarConfiguracion({ formato, cantidadParticipantes, cantidadGrupos });
 
   if (cambios.cantidadParticipantes !== undefined) {
-    const equipos = await torneoRepository.contarEquiposDeTorneo(id);
+    const equipos = await equipoRepository.contarEquiposDeTorneo(id);
     if (equipos > cambios.cantidadParticipantes) {
       throw new AppError(
         `Ya hay ${equipos} equipos inscriptos: la cantidad de participantes no puede ser menor.`,
