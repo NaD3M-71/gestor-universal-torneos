@@ -31,4 +31,9 @@ export const authService = {
   async logout(): Promise<void> {
     await axiosClient.post("/auth/logout");
   },
+
+  getCurrentUser: async (): Promise<UsuarioPublico> => {
+    const response = await axiosClient.get("/auth/me");
+    return response.data.usuario;
+  },
 };

@@ -14,6 +14,6 @@ const router: Router = Router();
 router.post('/registro', validarRegistro, handleInputErrors, registrar);
 router.post('/login', validarLogin, handleInputErrors, login);
 router.post('/logout', logout);
-router.get('/yo', autenticar, usuarioActual);
+router.get('/me', autenticar, usuarioActual);
 
 export default router;

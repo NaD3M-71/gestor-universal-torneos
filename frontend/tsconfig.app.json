@@ -22,5 +22,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "src/features/auth/hooks/useAuthForm.ts", "tests/features/auth/useAuthForm.test.tsx", "src/shared/utils/errorHandler.ts", "tests/features/auth/errorHandler.test.ts"]
+  "include": ["src", "src/features/auth/hooks/useAuthForm.ts", "src/tests/features/auth/useAuthForm.test.tsx", "src/shared/utils/errorHandler.ts", "src/tests/features/auth/errorHandler.test.ts"]
 }

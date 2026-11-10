@@ -1,7 +1,7 @@
 // Estado global de sesión y proveedor
 // administra la sesión del usuario en toda la aplicación de React
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type {
   UsuarioPublico,
   CredencialesLogin,
@@ -16,6 +16,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // ESTADO GLOBAL 'user': guarda el objeto del usuario logueado o 'null' si nadie inició sesión
   const [user, setUser] = useState<UsuarioPublico | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  useEffect(() => {
+    const verificarSesionActiva = async () => {
+      try {
+        // Llama al endpoint del usuario actual
+        const usuarioData = await authService.getCurrentUser();
+        setUser(usuarioData);
+      } finally {
+        // Si la cookie no existe o expiró, el backend responderá con error y dejamos el usuario en null
+        setUser(null);
+        setIsLoading(false);
+      }
+    };
+
+    verificarSesionActiva();
+  }, []);
 
   const login = async (credenciales: CredencialesLogin) => {
     setIsLoading(true);
