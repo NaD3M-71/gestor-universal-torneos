@@ -9,7 +9,6 @@
     // See also https://aka.ms/tsconfig/module
     "module": "nodenext",
     "target": "esnext",
-    "types": [],
     // For nodejs:
     "lib": ["esnext"],
     "types": ["node"],
@@ -37,5 +36,15 @@
     "noUncheckedSideEffectImports": true,
     "moduleDetection": "force",
     "skipLibCheck": true,
+
+    // --- CONFIGURACIÓN DE ALIAS ---
+    "paths": {
+      "@types/*": ["./src/types/*"],
+      "@services/*": ["./src/services/*"],
+      "@controllers/*": ["./src/controllers/*"],
+      "@repositories/*": ["./src/infrastructure/repositories/*"],
+      "@config/*": ["./src/config/*"],
+      "@prisma/*": ["./src/infrastructure/database/prisma/*"]
+    }
   }
 }
