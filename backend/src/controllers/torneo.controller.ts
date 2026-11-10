@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import {
   actualizarTorneo,
+  cancelarTorneo,
   crearTorneo,
   eliminarTorneo,
   listarTorneos,
@@ -104,4 +105,14 @@ export const eliminar = async (req: Request, res: Response): Promise<void> => {
   await eliminarTorneo(torneoIdDe(req), usuarioIdDe(req));
 
   res.status(204).end();
+};
+
+/**
+ * PATCH /api/torneos/:id/cancelar
+ * Cambia el estado de un torneo a cancelado.
+ */
+export const cancelar = async (req: Request, res: Response): Promise<void> => {
+  const torneo = await cancelarTorneo(torneoIdDe(req), usuarioIdDe(req));
+
+  res.status(200).json({ torneo });
 };

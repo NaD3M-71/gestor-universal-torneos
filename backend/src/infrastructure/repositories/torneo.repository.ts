@@ -4,6 +4,7 @@ import type {
   TorneoPublico,
 } from '../../types/torneo';
 import { prisma } from '../database';
+import { EstadoTorneo } from '@prisma/enums';
 
 /**
  * Guarda un torneo nuevo. El estado no se envía: la base lo deja en borrador.
@@ -32,6 +33,13 @@ export const actualizarTorneo = (
   datos: DatosActualizarTorneo
 ): Promise<TorneoPublico> =>
   prisma.torneo.update({ where: { id }, data: datos });
+
+/** Cambia el estado de un torneo. */
+export const cambiarEstadoTorneo = (
+  id: number,
+  estado: EstadoTorneo
+): Promise<TorneoPublico> =>
+  prisma.torneo.update({ where: { id }, data: { estado } });
 
 /**
  * Borra un torneo. La base elimina en cascada sus fases y sus equipos (y con

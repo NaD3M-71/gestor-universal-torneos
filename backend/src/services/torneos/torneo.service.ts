@@ -6,7 +6,7 @@ import type {
   DatosNuevoTorneo,
   TorneoPublico,
 } from '../../types/torneo';
-import { AppError } from '../../middlewares/errors/AppError';
+import { AppError } from '@middlewares/errors/AppError';
 import {
   ErrorValidacion,
   type DetalleValidacion,
@@ -189,4 +189,26 @@ export const eliminarTorneo = async (
   exigirBorrador(torneo, 'eliminar');
 
   await torneoRepository.eliminarTorneo(id);
+};
+
+/** Sirve para cancelar un torneo. Solo permite cancelarlo si está activo, no finalizado, y si no se cancelo antes */
+export const cancelarTorneo = async (
+  id: number,
+  usuarioId: number
+): Promise<TorneoPublico> => {
+  const torneo = await buscarTorneoPropio(id, usuarioId);
+
+  if (torneo.estado === EstadoTorneo.finalizado) {
+    throw new AppError(
+      'No se puede cancelar un torneo que ya ha finalizado.',
+      409
+    );
+  }
+
+  if (torneo.estado === EstadoTorneo.cancelado) {
+    throw new AppError('El torneo ya se encuentra cancelado.', 400);
+  }
+
+  // Si está en borrador o en_curso, se permite cancelar lógicamente
+  return await torneoRepository.cambiarEstadoTorneo(id, EstadoTorneo.cancelado);
 };
