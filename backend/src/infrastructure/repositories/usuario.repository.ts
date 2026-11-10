@@ -44,10 +44,10 @@ export const crearUsuario = async (
  * Devuelve null si no existe. El email se busca tal cual: el caso de uso ya
  * lo normaliza (sin espacios y en minúsculas), igual que al registrarse.
  */
-export const buscarPorEmail = (
+export const buscarPorEmail = async (
   email: string
-): Promise<UsuarioConContrasenia | null> =>
-  prisma.usuario.findUnique({
+): Promise<UsuarioConContrasenia | null> => {
+  const usuario = await prisma.usuario.findUnique({
     where: { email },
     select: {
       id: true,
@@ -57,3 +57,11 @@ export const buscarPorEmail = (
       contrasenia: true,
     },
   });
+
+  if (usuario === null) {
+    return null;
+  }
+
+  const { contrasenia, ...datosPublicos } = usuario;
+  return { ...datosPublicos, contrasenia: contrasenia };
+};
