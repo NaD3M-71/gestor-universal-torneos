@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import * as equipoRepository from '@repositories/equipo.repository';
 import * as torneoRepository from '@repositories/torneo.repository';
 import {
   actualizarTorneo,
@@ -12,14 +13,17 @@ import {
 import type { ErrorValidacion } from '../../../src/middlewares/errors/ErrorValidacion';
 import type { TorneoPublico } from '../../../src/types/torneo';
 
-// Se reemplaza el repositorio para no necesitar una base de datos.
+// Se reemplazan los repositorios para no necesitar una base de datos.
+vi.mock('@repositories/equipo.repository', () => ({
+  contarEquiposDeTorneo: vi.fn(),
+  limpiarGrupos: vi.fn(),
+}));
 vi.mock('@repositories/torneo.repository', () => ({
   crearTorneo: vi.fn(),
   listarTorneosDeCreador: vi.fn(),
   buscarTorneoPorId: vi.fn(),
   actualizarTorneo: vi.fn(),
   eliminarTorneo: vi.fn(),
-  contarEquiposDeTorneo: vi.fn(),
 }));
 
 const crearMock = vi.mocked(torneoRepository.crearTorneo);
@@ -27,7 +31,8 @@ const listarMock = vi.mocked(torneoRepository.listarTorneosDeCreador);
 const buscarMock = vi.mocked(torneoRepository.buscarTorneoPorId);
 const actualizarMock = vi.mocked(torneoRepository.actualizarTorneo);
 const eliminarMock = vi.mocked(torneoRepository.eliminarTorneo);
-const contarEquiposMock = vi.mocked(torneoRepository.contarEquiposDeTorneo);
+const contarEquiposMock = vi.mocked(equipoRepository.contarEquiposDeTorneo);
+const limpiarGruposMock = vi.mocked(equipoRepository.limpiarGrupos);
 
 const USUARIO_ID = 7;
 
@@ -299,6 +304,30 @@ describe('actualizarTorneo', () => {
       nombre: 'Copa',
       cantidadGrupos: 2,
     });
+  });
+
+  it('descarta los grupos asignados al cambiar la cantidad de grupos', async () => {
+    buscarMock.mockResolvedValue(torneoGrupos);
+
+    await actualizarTorneo(1, USUARIO_ID, { cantidadGrupos: 4 });
+
+    expect(limpiarGruposMock).toHaveBeenCalledWith(1);
+  });
+
+  it('descarta los grupos asignados al pasar a un formato sin grupos', async () => {
+    buscarMock.mockResolvedValue(torneoGrupos);
+
+    await actualizarTorneo(1, USUARIO_ID, { formato: 'liga_simple' });
+
+    expect(limpiarGruposMock).toHaveBeenCalledWith(1);
+  });
+
+  it('no toca los grupos si la cantidad de grupos no cambia', async () => {
+    buscarMock.mockResolvedValue(torneoGrupos);
+
+    await actualizarTorneo(1, USUARIO_ID, { nombre: 'Copa' });
+
+    expect(limpiarGruposMock).not.toHaveBeenCalled();
   });
 
   it('valida la configuración combinada con lo ya guardado', async () => {

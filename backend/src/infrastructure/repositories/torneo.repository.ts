@@ -34,6 +34,13 @@ export const actualizarTorneo = (
 ): Promise<TorneoPublico> =>
   prisma.torneo.update({ where: { id }, data: datos });
 
+/** Cambia el estado de un torneo. */
+export const cambiarEstadoTorneo = (
+  id: number,
+  estado: EstadoTorneo
+): Promise<TorneoPublico> =>
+  prisma.torneo.update({ where: { id }, data: { estado } });
+
 /**
  * Borra un torneo. La base elimina en cascada sus fases y sus equipos (y con
  * ellos los integrantes y enfrentamientos).
@@ -41,20 +48,3 @@ export const actualizarTorneo = (
 export const eliminarTorneo = async (id: number): Promise<void> => {
   await prisma.torneo.delete({ where: { id } });
 };
-
-/**
- * Cantidad de equipos ya inscriptos en un torneo. Lo usa la edición para no
- * dejar que cantidadParticipantes quede por debajo de los equipos cargados.
- * Cuando se haga la 2.3 puede pasar al repositorio de equipos.
- */
-export const contarEquiposDeTorneo = (torneoId: number): Promise<number> =>
-  prisma.equipo.count({ where: { torneoId } });
-
-/**
- * Cambiar el estado de un torneo
- */
-export const cambiarEstadoTorneo = (
-  id: number,
-  estado: EstadoTorneo
-): Promise<TorneoPublico> =>
-  prisma.torneo.update({ where: { id }, data: { estado } });
