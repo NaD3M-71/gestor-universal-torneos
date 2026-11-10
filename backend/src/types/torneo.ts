@@ -1,4 +1,8 @@
-import { EstadoTorneo, FormatoTorneo, SistemaPuntuacion } from '@prisma/enums';
+import type {
+  EstadoTorneo,
+  FormatoTorneo,
+  SistemaPuntuacion,
+} from '../infrastructure/database/prisma/enums';
 
 /**
  * Datos públicos de un torneo tal como se devuelven a la API o al cliente.
@@ -19,29 +23,30 @@ export interface TorneoPublico {
 
 /**
  * Datos necesarios para crear un torneo nuevo (DTO de entrada).
+ * El estado no se envía: todo torneo nace en borrador.
  */
 export interface DatosNuevoTorneo {
   creadorId: number;
   nombre: string;
-  descripcion?: string;
+  descripcion?: string | null;
   formato: FormatoTorneo;
   sistemaPuntuacion: SistemaPuntuacion;
   cantidadParticipantes: number;
-  cantidadGrupos?: number;
-  fechaInicio?: Date;
+  cantidadGrupos?: number | null;
+  fechaInicio?: Date | null;
 }
 
 /**
- * Datos para actualizar un torneo existente (permitiendo modificar campos de forma parcial).
+ * Datos para editar un torneo en borrador (todos opcionales). Con null se
+ * vacía un campo opcional. El estado y el campeón no se editan por acá: los
+ * cambia la lógica de inicio y cierre del torneo.
  */
 export interface DatosActualizarTorneo {
   nombre?: string;
-  descripcion?: string;
+  descripcion?: string | null;
   formato?: FormatoTorneo;
   sistemaPuntuacion?: SistemaPuntuacion;
   cantidadParticipantes?: number;
-  cantidadGrupos?: number;
-  fechaInicio?: Date;
-  estado?: EstadoTorneo;
-  campeonId?: number;
+  cantidadGrupos?: number | null;
+  fechaInicio?: Date | null;
 }
