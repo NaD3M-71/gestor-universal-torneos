@@ -43,7 +43,9 @@
       "@services/*": ["./src/services/*"],
       "@controllers/*": ["./src/controllers/*"],
       "@repositories/*": ["./src/infrastructure/repositories/*"],
+      "@middlewares/*": ["./src/middlewares/*"],
       "@config/*": ["./src/config/*"],
+      "@prisma": ["./src/infrastructure/database/*"],
       "@prisma/*": ["./src/infrastructure/database/prisma/*"]
     }
   }

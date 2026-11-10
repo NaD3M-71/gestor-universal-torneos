@@ -5,6 +5,7 @@ import {
   eliminar,
   listar,
   obtener,
+  cancelar,
 } from '@controllers/torneo.controller';
 import { autenticar } from '../middlewares/autenticar';
 import { handleInputErrors } from '../middlewares/errors/handleInputErrors';
@@ -29,6 +30,7 @@ router.patch(
   handleInputErrors,
   actualizar
 );
+router.patch('/:id/cancelar', autenticar, cancelar);
 router.delete('/:id', validarIdTorneo, handleInputErrors, eliminar);
 
 export default router;

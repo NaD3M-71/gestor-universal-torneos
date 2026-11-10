@@ -4,6 +4,7 @@ import type {
   TorneoPublico,
 } from '../../types/torneo';
 import { prisma } from '../database';
+import { EstadoTorneo } from '@prisma/enums';
 
 /**
  * Guarda un torneo nuevo. El estado no se envía: la base lo deja en borrador.
@@ -48,3 +49,12 @@ export const eliminarTorneo = async (id: number): Promise<void> => {
  */
 export const contarEquiposDeTorneo = (torneoId: number): Promise<number> =>
   prisma.equipo.count({ where: { torneoId } });
+
+/**
+ * Cambiar el estado de un torneo
+ */
+export const cambiarEstadoTorneo = (
+  id: number,
+  estado: EstadoTorneo
+): Promise<TorneoPublico> =>
+  prisma.torneo.update({ where: { id }, data: { estado } });
