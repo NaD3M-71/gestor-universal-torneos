@@ -13,6 +13,7 @@
     "db:seed": "node --env-file-if-exists=../.env --import tsx seeders/seed.ts",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "lint": "eslint \"src/**/*.ts\"",
     "format": "prettier --write \"src/**/*.ts\""
   },
@@ -44,6 +45,7 @@
     "@types/pg": "^8.20.0",
     "@typescript-eslint/eslint-plugin": "^8.71.2",
     "@typescript-eslint/parser": "^8.71.2",
+    "@vitest/coverage-v8": "5.0.5",
     "eslint": "^10.12.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.7",

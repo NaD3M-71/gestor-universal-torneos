@@ -1,17 +1,18 @@
-import axios from 'axios';
+import axios from "axios";
 
 // Cliente HTTP único del frontend. Todas las llamadas a la API pasan por acá.
 // La URL base sale de VITE_API_URL (ver .env.example en la raíz del repo).
 // Si la variable no está definida, usa el backend local en el puerto 3000.
-export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+export const API_URL =
+  import.meta.env.VITE_API_URL || "http://localhost:3000/api";
 
 export const axiosClient = axios.create({
   baseURL: API_URL,
   timeout: 10000,
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
-  // Necesario para que el navegador envíe y reciba la cookie httpOnly con el JWT.
+  // Necesario para que el navegador envíe y reciba la cookie httpOnly con el JWT
   withCredentials: true,
 });
 
@@ -19,5 +20,5 @@ export const axiosClient = axios.create({
 // cuando se implemente la autenticación.
 axiosClient.interceptors.response.use(
   (response) => response,
-  (error) => Promise.reject(error)
+  (error) => Promise.reject(error),
 );
