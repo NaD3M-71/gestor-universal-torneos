@@ -1,45 +1,9 @@
-import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import { useAuth } from "../hooks/useAuth";
+import { Link } from "react-router-dom";
+import { useAuthForm } from "../hooks/useAuthForm";
 
 export function LoginView() {
-  const [email, setEmail] = useState("");
-  const [contrasenia, setContrasenia] = useState("");
-  const [error, setError] = useState<string | null>(null);
-
-  const { login, isLoading } = useAuth();
-  const navigate = useNavigate();
-
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setError(null);
-
-    try {
-      // Llamamos a la función de login del contexto
-      await login({ email, contrasenia });
-      // Si todo sale bien, redirigimos al usuario a la página principal (o a un dashboard)
-      navigate("/");
-    } catch (err: unknown) {
-      // Si el backend rechaza las credenciales, capturamos el error para mostrarlo
-      const errorObj = err as {
-        response?: {
-          data?: {
-            mensaje?: string;
-            detalles?: Array<{ mensaje: string }>;
-          };
-        };
-      };
-
-      const backendDetalles = errorObj.response?.data?.detalles;
-      if (backendDetalles && backendDetalles.length > 0) {
-        setError(backendDetalles[0].mensaje);
-      } else {
-        setError(
-          errorObj.response?.data?.mensaje || "Error al iniciar sesión.",
-        );
-      }
-    }
-  };
+  const { register, handleSubmit, errors, isLoading, getInputClass } =
+    useAuthForm("login");
 
   return (
     <div className="flex-1 flex items-center justify-center p-6 bg-grafito">
@@ -48,9 +12,9 @@ export function LoginView() {
           Iniciar Sesión
         </h2>
 
-        {error && (
+        {errors.root && (
           <div className="mb-4 p-3 bg-red-900/50 border border-red-500 text-red-200 text-sm rounded-lg text-center">
-            {error}
+            {errors.root.message}
           </div>
         )}
 
@@ -61,12 +25,15 @@ export function LoginView() {
             </label>
             <input
               type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-dorado"
+              {...register("email", { required: "El correo es obligatorio" })}
+              className={getInputClass(!!errors.email, "focus:border-dorado")}
               placeholder="organizador@torneo.com"
             />
+            {errors.email && (
+              <span className="text-xs text-red-400 mt-1 block">
+                {errors.email.message}
+              </span>
+            )}
           </div>
 
           <div>
@@ -75,12 +42,20 @@ export function LoginView() {
             </label>
             <input
               type="password"
-              required
-              value={contrasenia}
-              onChange={(e) => setContrasenia(e.target.value)}
-              className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-dorado"
+              {...register("contrasenia", {
+                required: "La contraseña es obligatoria",
+              })}
+              className={getInputClass(
+                !!errors.contrasenia,
+                "focus:border-dorado",
+              )}
               placeholder="••••••••"
             />
+            {errors.contrasenia && (
+              <span className="text-xs text-red-400 mt-1 block">
+                {errors.contrasenia.message}
+              </span>
+            )}
           </div>
 
           <button
