@@ -15,7 +15,7 @@ import { AuthContext } from "./AuthContextObject"; // Importamos el contexto des
 export function AuthProvider({ children }: { children: ReactNode }) {
   // ESTADO GLOBAL 'user': guarda el objeto del usuario logueado o 'null' si nadie inició sesión
   const [user, setUser] = useState<UsuarioPublico | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
     const verificarSesionActiva = async () => {
@@ -23,9 +23,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Llama al endpoint del usuario actual
         const usuarioData = await authService.getCurrentUser();
         setUser(usuarioData);
-      } finally {
-        // Si la cookie no existe o expiró, el backend responderá con error y dejamos el usuario en null
+      } catch {
+        // Si la cookie no existe, expiró o hubo un error, dejamos el usuario en null
         setUser(null);
+      } finally {
+        // El setIsLoading se ejecuta al terminar, sin importar si salió bien o mal
         setIsLoading(false);
       }
     };

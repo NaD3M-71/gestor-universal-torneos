@@ -2,6 +2,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider, LoginView, RegisterView } from "./features/auth";
 import { HomeView } from "./features/home";
 import { MainLayout } from "./shared/components/Layout";
+import { ProtectedRoute } from "@components/ProtectedRoute";
+import { MisTorneosView } from "@features/torneos/views/MisTorneosView";
 
 export default function App() {
   return (
@@ -15,6 +17,12 @@ export default function App() {
             <Route path="/" element={<HomeView />} />
             <Route path="/login" element={<LoginView />} />
             <Route path="/registro" element={<RegisterView />} />
+          </Route>
+
+          {/* Rutas Protegidas */}
+          <Route element={<ProtectedRoute />}>
+            <Route path="/torneos" element={<MisTorneosView />} />
+            {/* Aquí van después las de crear y editar torneo */}
           </Route>
         </Routes>
       </AuthProvider>
