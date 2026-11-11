@@ -7,7 +7,7 @@ import {
   eliminarEquipo,
   listarEquipos,
   sortearGrupos,
-} from '@services/equipos/equipo.service';
+} from '@services/equipo.service';
 import { obtenerTorneo } from '@services/torneos/torneo.service';
 import { AppError } from '../../../src/middlewares/errors/AppError';
 import type { EquipoPublico } from '../../../src/types/equipo';
