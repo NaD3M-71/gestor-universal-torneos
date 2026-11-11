@@ -5,18 +5,18 @@ import type {
   DatosActualizarTorneo,
   DatosNuevoTorneo,
   TorneoPublico,
-} from '../../types/torneo';
+} from '../types/torneo';
 import type {
   DatosNuevaFase,
   DatosNuevoEnfrentamiento,
   TorneoIniciado,
-} from '../../types/fase';
-import { generarRoundRobin } from '@services/torneos/fixture/roundRobin.engine';
+} from '../types/fase';
+import { generarRoundRobin } from '@services/fixture/roundRobin.engine';
 import { AppError } from '@middlewares/errors/AppError';
 import {
   ErrorValidacion,
   type DetalleValidacion,
-} from '../../middlewares/errors/ErrorValidacion';
+} from '../middlewares/errors/ErrorValidacion';
 
 /** Los campos del torneo cuyas reglas dependen unas de otras. */
 export type ConfiguracionTorneo = Pick<

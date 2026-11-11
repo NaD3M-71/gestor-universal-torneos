@@ -3,7 +3,7 @@ import {
   iniciarSesion,
   obtenerUsuarioActual,
   registrarUsuario,
-} from '@services/auth/auth.service';
+} from '@services/auth.service';
 import { AppError } from '../middlewares/errors/AppError';
 import { env } from '../config/env';
 import {

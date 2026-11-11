@@ -10,10 +10,10 @@ import {
   obtenerTorneo,
   validarConfiguracion,
   type ConfiguracionTorneo,
-} from '@services/torneos/torneo.service';
-import type { ErrorValidacion } from '../../../src/middlewares/errors/ErrorValidacion';
-import type { EquipoPublico } from '../../../src/types/equipo';
-import type { TorneoPublico } from '../../../src/types/torneo';
+} from '@services/torneo.service';
+import type { ErrorValidacion } from '../../src/middlewares/errors/ErrorValidacion';
+import type { EquipoPublico } from '../../src/types/equipo';
+import type { TorneoPublico } from '../../src/types/torneo';
 
 // Se reemplazan los repositorios para no necesitar una base de datos.
 vi.mock('@repositories/equipo.repository', () => ({

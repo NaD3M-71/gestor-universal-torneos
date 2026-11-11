@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import { cargarResultado } from '@services/enfrentamientos/enfrentamiento.service';
+import { cargarResultado } from '@services/enfrentamiento.service';
 import { AppError } from '../middlewares/errors/AppError';
 
 /** Id del organizador que carga el middleware autenticar (401 si falta). */

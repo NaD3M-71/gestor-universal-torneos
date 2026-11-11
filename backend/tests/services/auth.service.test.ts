@@ -9,9 +9,9 @@ import {
   iniciarSesion,
   obtenerUsuarioActual,
   registrarUsuario,
-} from '@services/auth/auth.service';
+} from '@services/auth.service';
 import { generarToken } from '@services/auth/token';
-import { AppError } from '../../../src/middlewares/errors/AppError';
+import { AppError } from '../../src/middlewares/errors/AppError';
 
 // Se reemplazan el repositorio (sin base de datos) y el token (así no se carga
 // config/env, que exige variables de entorno).

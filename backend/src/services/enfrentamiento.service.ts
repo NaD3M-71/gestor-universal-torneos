@@ -1,16 +1,16 @@
 import { EstadoTorneo, SistemaPuntuacion } from '@prisma/enums';
 import * as enfrentamientoRepository from '@repositories/enfrentamiento.repository';
-import { obtenerTorneo } from '@services/torneos/torneo.service';
-import { AppError } from '../../middlewares/errors/AppError';
+import { obtenerTorneo } from '@services/torneo.service';
+import { AppError } from '../middlewares/errors/AppError';
 import {
   ErrorValidacion,
   type DetalleValidacion,
-} from '../../middlewares/errors/ErrorValidacion';
+} from '../middlewares/errors/ErrorValidacion';
 import type {
   DatosResultado,
   EnfrentamientoPublico,
   ResultadoEnfrentamiento,
-} from '../../types/enfrentamiento';
+} from '../types/enfrentamiento';
 
 const ESTADO_FASE_ACTIVA = 'activa';
 

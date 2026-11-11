@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   generarRoundRobin,
   type FechaGenerada,
-} from '@services/torneos/fixture/roundRobin.engine';
+} from '@services/fixture/roundRobin.engine';
 
 // Equipos con ids 1..n
 const equipos = (cantidad: number): number[] =>

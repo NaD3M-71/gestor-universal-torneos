@@ -13,6 +13,7 @@ import { handleInputErrors } from '../middlewares/errors/handleInputErrors';
 import equipoRoutes from './equipo.routes';
 import grupoRoutes from './grupo.routes';
 import enfrentamientoRoutes from './enfrentamiento.routes';
+import posicionRoutes from './posicion.routes';
 import {
   validarAltaTorneo,
   validarEdicionTorneo,
@@ -32,6 +33,9 @@ router.use('/:torneoId/grupos', grupoRoutes);
 
 // Resultados de los enfrentamientos: /api/torneos/:torneoId/enfrentamientos
 router.use('/:torneoId/enfrentamientos', enfrentamientoRoutes);
+
+// Tabla de posiciones de una fase: /api/torneos/:torneoId/posiciones
+router.use('/:torneoId/posiciones', posicionRoutes);
 
 router.post('/', validarAltaTorneo, handleInputErrors, crear);
 router.get('/', listar);

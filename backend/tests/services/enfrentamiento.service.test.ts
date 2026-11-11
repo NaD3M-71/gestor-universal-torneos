@@ -3,15 +3,15 @@ import * as enfrentamientoRepository from '@repositories/enfrentamiento.reposito
 import {
   cargarResultado,
   validarDatosResultado,
-} from '@services/enfrentamientos/enfrentamiento.service';
-import { obtenerTorneo } from '@services/torneos/torneo.service';
-import { AppError } from '../../../src/middlewares/errors/AppError';
-import type { ErrorValidacion } from '../../../src/middlewares/errors/ErrorValidacion';
+} from '@services/enfrentamiento.service';
+import { obtenerTorneo } from '@services/torneo.service';
+import { AppError } from '../../src/middlewares/errors/AppError';
+import type { ErrorValidacion } from '../../src/middlewares/errors/ErrorValidacion';
 import type {
   DatosResultado,
   EnfrentamientoConFase,
-} from '../../../src/types/enfrentamiento';
-import type { TorneoPublico } from '../../../src/types/torneo';
+} from '../../src/types/enfrentamiento';
+import type { TorneoPublico } from '../../src/types/torneo';
 
 // Se reemplazan el repositorio (sin base de datos) y la búsqueda de torneos,
 // que ya tiene sus propios tests.
@@ -19,7 +19,7 @@ vi.mock('@repositories/enfrentamiento.repository', () => ({
   buscarEnfrentamientoConFase: vi.fn(),
   guardarResultado: vi.fn(),
 }));
-vi.mock('@services/torneos/torneo.service', () => ({
+vi.mock('@services/torneo.service', () => ({
   obtenerTorneo: vi.fn(),
 }));
 

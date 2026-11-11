@@ -1,19 +1,19 @@
 import { randomInt } from 'node:crypto';
 import { EstadoTorneo, FormatoTorneo } from '@prisma/enums';
 import * as equipoRepository from '@repositories/equipo.repository';
-import { obtenerTorneo } from '@services/torneos/torneo.service';
-import { AppError } from '../../middlewares/errors/AppError';
+import { obtenerTorneo } from '@services/torneo.service';
+import { AppError } from '../middlewares/errors/AppError';
 import {
   ErrorValidacion,
   type DetalleValidacion,
-} from '../../middlewares/errors/ErrorValidacion';
+} from '../middlewares/errors/ErrorValidacion';
 import type {
   AsignacionGrupo,
   DatosActualizarEquipo,
   DatosNuevoEquipo,
   EquipoPublico,
-} from '../../types/equipo';
-import type { TorneoPublico } from '../../types/torneo';
+} from '../types/equipo';
+import type { TorneoPublico } from '../types/torneo';
 
 /**
  * Torneo del organizador (404 si no existe o es de otro) en el que se pueden
