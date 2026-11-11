@@ -1,4 +1,3 @@
-// src/features/torneos/components/TablaTorneos.tsx
 import React from "react";
 import type { Torneo } from "../types/torneo.types";
 
@@ -20,35 +19,33 @@ export const TablaTorneos: React.FC<TablaTorneosProps> = ({
   }
 
   return (
-    <div className="overflow-x-auto bg-white rounded-lg shadow border border-gray-100">
-      <table className="min-w-full divide-y divide-gray-200">
+    <div className="bg-white rounded-lg shadow border border-gray-100 overflow-hidden">
+      {/* Contenedor fluido sin forzar desbordes innecesarios */}
+      <table className="w-full divide-y divide-gray-200 table-fixed">
         <thead className="bg-gray-50">
           <tr>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="w-1/4 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Nombre
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="w-1/6 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Formato
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="w-1/6 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Puntuación
             </th>
-            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Participantes
+            <th className="w-16 px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Equipos
             </th>
-            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="w-16 px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
               Grupos
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="w-24 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Inicio
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="w-28 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Estado
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Campeón
-            </th>
-            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="w-24 px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
               Acciones
             </th>
           </tr>
@@ -56,29 +53,32 @@ export const TablaTorneos: React.FC<TablaTorneosProps> = ({
         <tbody className="bg-white divide-y divide-gray-200">
           {torneos.map((torneo) => (
             <tr key={torneo.id} className="hover:bg-gray-50 transition-colors">
-              <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
+              <td
+                className="px-4 py-3 font-medium text-gray-900 truncate"
+                title={torneo.nombre}
+              >
                 {torneo.nombre}
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 capitalize">
+              <td className="px-3 py-3 text-xs text-gray-600 capitalize truncate">
                 {torneo.formato.replace("_", " ")}
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 capitalize">
+              <td className="px-3 py-3 text-xs text-gray-600 capitalize truncate">
                 {torneo.sistemaPuntuacion.replace("_", " ")}
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-600">
+              <td className="px-2 py-3 text-xs text-center text-gray-600">
                 {torneo.cantidadParticipantes}
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-600">
+              <td className="px-2 py-3 text-xs text-center text-gray-600">
                 {torneo.cantidadGrupos ?? "-"}
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+              <td className="px-3 py-3 text-xs text-gray-600 whitespace-nowrap">
                 {torneo.fechaInicio
                   ? new Date(torneo.fechaInicio).toLocaleDateString()
                   : "Sin definir"}
               </td>
-              <td className="px-6 py-4 whitespace-nowrap">
+              <td className="px-3 py-3 whitespace-nowrap">
                 <span
-                  className={`px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full capitalize
+                  className={`px-2 py-0.5 inline-flex text-[10px] leading-4 font-semibold rounded-full capitalize
                   ${torneo.estado === "en_curso" ? "bg-green-100 text-green-800" : ""}
                   ${torneo.estado === "borrador" ? "bg-yellow-100 text-yellow-800" : ""}
                   ${torneo.estado === "finalizado" ? "bg-blue-100 text-blue-800" : ""}
@@ -88,14 +88,10 @@ export const TablaTorneos: React.FC<TablaTorneosProps> = ({
                   {torneo.estado.replace("_", " ")}
                 </span>
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                {torneo.campeon?.nombre ??
-                  (torneo.estado === "finalizado" ? "Definido" : "-")}
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+              <td className="px-3 py-3 text-right text-xs font-medium">
                 <button
                   onClick={() => onAccion(torneo)}
-                  className="text-blue-600 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-md transition-colors"
+                  className="text-blue-600 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-md transition-colors"
                 >
                   {torneo.estado === "borrador" ? "Editar" : "Ver"}
                 </button>

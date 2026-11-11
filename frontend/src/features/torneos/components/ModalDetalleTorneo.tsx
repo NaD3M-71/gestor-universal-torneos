@@ -1,4 +1,3 @@
-// src/features/torneos/components/ModalDetalleTorneo.tsx
 import React from "react";
 import type { Torneo } from "../types/torneo.types";
 

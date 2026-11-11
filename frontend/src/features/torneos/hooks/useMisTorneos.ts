@@ -1,4 +1,3 @@
-// src/features/torneos/hooks/useMisTorneos.ts
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { obtenerTorneos } from "../service/torneoService";

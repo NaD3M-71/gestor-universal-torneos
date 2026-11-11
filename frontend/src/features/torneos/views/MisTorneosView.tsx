@@ -1,4 +1,3 @@
-// src/features/torneos/views/MisTorneosView.tsx
 import React from "react";
 import { useMisTorneos } from "../hooks/useMisTorneos";
 import { TablaTorneos } from "../components/TablaTorneos";

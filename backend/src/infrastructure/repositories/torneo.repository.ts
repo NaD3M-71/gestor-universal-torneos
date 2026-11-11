@@ -21,11 +21,29 @@ export const listarTorneosDeCreador = (
   prisma.torneo.findMany({
     where: { creadorId },
     orderBy: { id: 'desc' },
+    include: {
+      campeon: {
+        select: {
+          id: true,
+          nombre: true,
+        },
+      },
+    },
   });
 
 /** Busca un torneo por id. Devuelve null si no existe. */
 export const buscarTorneoPorId = (id: number): Promise<TorneoPublico | null> =>
-  prisma.torneo.findUnique({ where: { id } });
+  prisma.torneo.findUnique({
+    where: { id },
+    include: {
+      campeon: {
+        select: {
+          id: true,
+          nombre: true,
+        },
+      },
+    },
+  });
 
 /** Aplica los cambios recibidos (parciales) y devuelve el torneo actualizado. */
 export const actualizarTorneo = (

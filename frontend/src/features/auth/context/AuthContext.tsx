@@ -15,7 +15,7 @@ import { AuthContext } from "./AuthContextObject"; // Importamos el contexto des
 export function AuthProvider({ children }: { children: ReactNode }) {
   // ESTADO GLOBAL 'user': guarda el objeto del usuario logueado o 'null' si nadie inició sesión
   const [user, setUser] = useState<UsuarioPublico | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
     const verificarSesionActiva = async () => {
