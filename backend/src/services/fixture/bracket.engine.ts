@@ -114,3 +114,84 @@ export function generarBracket(cantidadParticipantes: number): Bracket {
 
   return { tamano, byes, cantidadRondas, partidos };
 }
+
+// Partido del bracket con los equipos ya ubicados. En un bye equipoBId queda
+// vacío y el ganador es automático: el equipo pasa solo a la ronda siguiente.
+export interface PartidoAsignado extends PartidoBracket {
+  equipoAId: number | null;
+  equipoBId: number | null;
+  ganadorId: number | null;
+}
+
+// Sorteo para cuando no hay una fase previa que haya dado un ranking: mezcla
+// los equipos y el primero queda como semilla 1. Como los byes les tocan a las
+// primeras semillas, sortear el orden también sortea quién tiene bye.
+// "aleatorio" devuelve un número entre 0 y 1 (se puede reemplazar en los tests).
+export function sortearParticipantes(
+  equipoIds: number[],
+  aleatorio: () => number = () => Math.random()
+): number[] {
+  return equipoIds
+    .map((id) => ({ id, orden: aleatorio() }))
+    .sort((a, b) => a.orden - b.orden)
+    .map((item) => item.id);
+}
+
+// Ubica los equipos en el bracket. equipoIds va ordenado por semilla: el
+// primero es la semilla 1 (por ranking de la fase previa o por sorteo).
+// Los partidos bye quedan con ganador automático y el equipo se promueve al
+// partido que indica siguienteIndice / ladoSiguiente.
+export function asignarEquipos(
+  bracket: Bracket,
+  equipoIds: number[]
+): PartidoAsignado[] {
+  const cantidadParticipantes = bracket.tamano - bracket.byes;
+
+  if (equipoIds.length !== cantidadParticipantes) {
+    throw new Error(
+      `El bracket es para ${cantidadParticipantes} equipos y llegaron ${equipoIds.length}`
+    );
+  }
+  if (new Set(equipoIds).size !== equipoIds.length) {
+    throw new Error('Hay equipos repetidos en la lista');
+  }
+
+  const asignados: PartidoAsignado[] = bracket.partidos.map((partido) => {
+    const equipoAId =
+      partido.semillaA === null
+        ? null
+        : (equipoIds[partido.semillaA - 1] ?? null);
+    const equipoBId =
+      partido.semillaB === null
+        ? null
+        : (equipoIds[partido.semillaB - 1] ?? null);
+
+    return {
+      ...partido,
+      equipoAId,
+      equipoBId,
+      ganadorId: partido.esBye ? equipoAId : null,
+    };
+  });
+
+  // Promoción de los byes. Alcanza con un solo salto: nunca hay dos byes
+  // alimentando al mismo partido de la ronda siguiente y dejándolo sin rival.
+  asignados
+    .filter((partido) => partido.esBye)
+    .forEach((bye) => {
+      const siguiente =
+        bye.siguienteIndice === null
+          ? undefined
+          : asignados[bye.siguienteIndice];
+      if (!siguiente) {
+        return;
+      }
+      if (bye.ladoSiguiente === 'A') {
+        siguiente.equipoAId = bye.ganadorId;
+      } else {
+        siguiente.equipoBId = bye.ganadorId;
+      }
+    });
+
+  return asignados;
+}

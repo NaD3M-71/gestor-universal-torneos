@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  asignarEquipos,
   calcularTamanoBracket,
   generarBracket,
+  sortearParticipantes,
   type PartidoBracket,
 } from '@services/fixture/bracket.engine';
 
-const deRonda = (partidos: PartidoBracket[], ronda: number): PartidoBracket[] =>
+const deRonda = <T extends PartidoBracket>(partidos: T[], ronda: number): T[] =>
   partidos.filter((partido) => partido.ronda === ronda);
 
 describe('calcularTamanoBracket', () => {
@@ -211,4 +213,108 @@ describe('generarBracket - validaciones', () => {
       );
     },
   );
+});
+
+describe('sortearParticipantes', () => {
+  it('devuelve los mismos equipos sin modificar la lista original', () => {
+    const original = [1, 2, 3, 4, 5];
+    const sorteados = sortearParticipantes(original);
+
+    expect([...sorteados].sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5]);
+    expect(original).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it('ordena según el número aleatorio que le toca a cada equipo', () => {
+    const valores = [0.9, 0.1, 0.5];
+    let llamada = 0;
+    const aleatorio = (): number => valores[llamada++] ?? 0;
+
+    expect(sortearParticipantes([1, 2, 3], aleatorio)).toEqual([2, 3, 1]);
+  });
+});
+
+describe('asignarEquipos', () => {
+  // Equipos con ids 11..(10+n); el 11 es la semilla 1
+  const equipos = (cantidad: number): number[] =>
+    Array.from({ length: cantidad }, (_, i) => i + 11);
+
+  it('con 8 equipos ubica a todos en la primera ronda y no hay ganadores', () => {
+    const partidos = asignarEquipos(generarBracket(8), equipos(8));
+    const primera = deRonda(partidos, 1);
+
+    expect(primera.map((p) => [p.equipoAId, p.equipoBId])).toEqual([
+      [11, 18],
+      [14, 15],
+      [12, 17],
+      [13, 16],
+    ]);
+    partidos.forEach((p) => expect(p.ganadorId).toBeNull());
+    partidos
+      .filter((p) => p.ronda > 1)
+      .forEach((p) => {
+        expect(p.equipoAId).toBeNull();
+        expect(p.equipoBId).toBeNull();
+      });
+  });
+
+  it('con 7 equipos el bye deja equipo B vacío y ganador automático', () => {
+    const partidos = asignarEquipos(generarBracket(7), equipos(7));
+    const bye = partidos.find((p) => p.esBye);
+
+    expect(bye?.equipoAId).toBe(11);
+    expect(bye?.equipoBId).toBeNull();
+    expect(bye?.ganadorId).toBe(11);
+  });
+
+  it('el equipo con bye se promueve al lado que indica siguienteIndice', () => {
+    const partidos = asignarEquipos(generarBracket(7), equipos(7));
+    const bye = partidos.find((p) => p.esBye);
+    const siguiente = partidos[bye?.siguienteIndice ?? -1];
+
+    expect(siguiente?.ronda).toBe(2);
+    expect(siguiente?.equipoAId).toBe(11);
+    // El otro lado espera al ganador del partido que sí se juega
+    expect(siguiente?.equipoBId).toBeNull();
+  });
+
+  it('los partidos que se juegan quedan sin ganador', () => {
+    const partidos = asignarEquipos(generarBracket(7), equipos(7));
+
+    partidos
+      .filter((p) => !p.esBye)
+      .forEach((p) => expect(p.ganadorId).toBeNull());
+  });
+
+  it('con 5 equipos hay 3 byes y dos equipos promovidos pueden quedar enfrentados', () => {
+    const bracket = generarBracket(5);
+    const partidos = asignarEquipos(bracket, equipos(5));
+    const byes = partidos.filter((p) => p.esBye);
+
+    expect(byes).toHaveLength(3);
+    byes.forEach((p) => expect(p.ganadorId).toBe(p.equipoAId));
+    // Los byes de las semillas 2 y 3 son consecutivos: sus equipos se cruzan en semifinal
+    const semifinal = deRonda(partidos, 2)[1];
+    expect([semifinal?.equipoAId, semifinal?.equipoBId]).toEqual([12, 13]);
+  });
+
+  it('cada equipo aparece una sola vez en la primera ronda', () => {
+    const ids = deRonda(asignarEquipos(generarBracket(11), equipos(11)), 1)
+      .flatMap((p) => [p.equipoAId, p.equipoBId])
+      .filter((id): id is number => id !== null)
+      .sort((a, b) => a - b);
+
+    expect(ids).toEqual(equipos(11));
+  });
+
+  it('lanza error si la cantidad de equipos no coincide con el bracket', () => {
+    expect(() => asignarEquipos(generarBracket(7), equipos(6))).toThrow(
+      'El bracket es para 7 equipos y llegaron 6'
+    );
+  });
+
+  it('lanza error si hay equipos repetidos', () => {
+    expect(() => asignarEquipos(generarBracket(4), [1, 2, 2, 3])).toThrow(
+      'Hay equipos repetidos'
+    );
+  });
 });
