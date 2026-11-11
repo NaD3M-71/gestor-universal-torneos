@@ -19,6 +19,10 @@ export interface TorneoPublico {
   fechaInicio: Date | null;
   estado: EstadoTorneo;
   campeonId: number | null;
+  campeon?: {
+    id: number;
+    nombre: string;
+  } | null;
 }
 
 /**

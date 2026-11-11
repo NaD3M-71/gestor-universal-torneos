@@ -1,4 +1,4 @@
-import { axiosClient } from "../../../shared/api/axiosClient";
+import { axiosClient } from "@axios-client";
 import type {
   UsuarioPublico,
   CredencialesLogin,
