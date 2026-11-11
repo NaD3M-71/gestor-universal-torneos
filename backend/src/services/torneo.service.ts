@@ -5,13 +5,13 @@ import type {
   DatosActualizarTorneo,
   DatosNuevoTorneo,
   TorneoPublico,
-} from '../../types/torneo';
-import type { DatosNuevaFase, TorneoIniciado } from '../../types/fase';
+} from '../types/torneo';
+import type { DatosNuevaFase, TorneoIniciado } from '../types/fase';
 import { AppError } from '@middlewares/errors/AppError';
 import {
   ErrorValidacion,
   type DetalleValidacion,
-} from '../../middlewares/errors/ErrorValidacion';
+} from '@middlewares/errors/ErrorValidacion';
 
 /** Los campos del torneo cuyas reglas dependen unas de otras. */
 export type ConfiguracionTorneo = Pick<
@@ -272,6 +272,6 @@ export const iniciarTorneo = async (
   return torneoRepository.iniciarTorneo(
     id,
     equipos.length,
-    FASE_INICIAL[torneo.formato]
+    FASE_INICIAL[torneo.formato as FormatoTorneo]
   );
 };
