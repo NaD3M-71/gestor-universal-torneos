@@ -5,18 +5,21 @@ import {
   actualizarTorneo,
   crearTorneo,
   eliminarTorneo,
+  iniciarTorneo,
   listarTorneos,
   obtenerTorneo,
   validarConfiguracion,
   type ConfiguracionTorneo,
 } from '@services/torneos/torneo.service';
 import type { ErrorValidacion } from '../../../src/middlewares/errors/ErrorValidacion';
+import type { EquipoPublico } from '../../../src/types/equipo';
 import type { TorneoPublico } from '../../../src/types/torneo';
 
 // Se reemplazan los repositorios para no necesitar una base de datos.
 vi.mock('@repositories/equipo.repository', () => ({
   contarEquiposDeTorneo: vi.fn(),
   limpiarGrupos: vi.fn(),
+  listarEquiposDeTorneo: vi.fn(),
 }));
 vi.mock('@repositories/torneo.repository', () => ({
   crearTorneo: vi.fn(),
@@ -24,6 +27,7 @@ vi.mock('@repositories/torneo.repository', () => ({
   buscarTorneoPorId: vi.fn(),
   actualizarTorneo: vi.fn(),
   eliminarTorneo: vi.fn(),
+  iniciarTorneo: vi.fn(),
 }));
 
 const crearMock = vi.mocked(torneoRepository.crearTorneo);
@@ -31,8 +35,10 @@ const listarMock = vi.mocked(torneoRepository.listarTorneosDeCreador);
 const buscarMock = vi.mocked(torneoRepository.buscarTorneoPorId);
 const actualizarMock = vi.mocked(torneoRepository.actualizarTorneo);
 const eliminarMock = vi.mocked(torneoRepository.eliminarTorneo);
+const iniciarMock = vi.mocked(torneoRepository.iniciarTorneo);
 const contarEquiposMock = vi.mocked(equipoRepository.contarEquiposDeTorneo);
 const limpiarGruposMock = vi.mocked(equipoRepository.limpiarGrupos);
+const listarEquiposMock = vi.mocked(equipoRepository.listarEquiposDeTorneo);
 
 const USUARIO_ID = 7;
 
@@ -410,5 +416,170 @@ describe('eliminarTorneo', () => {
       statusCode: 409,
     });
     expect(eliminarMock).not.toHaveBeenCalled();
+  });
+});
+
+/** Equipos de prueba, todos con el mismo grupo (null si el torneo no usa grupos). */
+const equiposDe = (
+  cantidad: number,
+  grupo: number | null = null
+): EquipoPublico[] =>
+  Array.from({ length: cantidad }, (_, i) => ({
+    id: i + 1,
+    torneoId: 1,
+    nombre: `Equipo ${i + 1}`,
+    grupo,
+    integrantes: [],
+  }));
+
+describe('iniciarTorneo', () => {
+  beforeEach(() => {
+    buscarMock.mockResolvedValue(torneoLiga);
+    listarEquiposMock.mockResolvedValue(equiposDe(8));
+    iniciarMock.mockImplementation(async (id, cantidadParticipantes, fase) => ({
+      torneo: {
+        ...torneoLiga,
+        id,
+        estado: 'en_curso',
+        cantidadParticipantes,
+      },
+      fase: {
+        id: 10,
+        torneoId: id,
+        estado: 'activa',
+        lineaDeCorte: null,
+        comentarioDesempate: null,
+        ...fase,
+      },
+    }));
+  });
+
+  it('inicia un torneo en borrador y devuelve el torneo en curso con su primera fase', async () => {
+    const resultado = await iniciarTorneo(1, USUARIO_ID);
+
+    expect(resultado.torneo.estado).toBe('en_curso');
+    expect(resultado.fase).toMatchObject({
+      torneoId: 1,
+      tipo: 'liga',
+      orden: 1,
+      estado: 'activa',
+      idaYVuelta: false,
+    });
+  });
+
+  it.each([
+    ['liga_simple', 'liga', false],
+    ['liga_doble', 'liga', true],
+    ['eliminacion_simple', 'eliminacion', false],
+    ['eliminacion_doble', 'eliminacion', true],
+    ['liguilla_eliminacion', 'liga', false],
+    ['grupos_eliminatorias', 'grupos', false],
+  ] as const)(
+    'con formato %s crea una fase %s (idaYVuelta: %s)',
+    async (formato, tipo, idaYVuelta) => {
+      const usaGrupos = formato === 'grupos_eliminatorias';
+      buscarMock.mockResolvedValue({
+        ...torneoLiga,
+        formato,
+        cantidadGrupos: usaGrupos ? 2 : null,
+      });
+      listarEquiposMock.mockResolvedValue(equiposDe(8, usaGrupos ? 1 : null));
+
+      await iniciarTorneo(1, USUARIO_ID);
+
+      expect(iniciarMock).toHaveBeenCalledWith(1, 8, {
+        tipo,
+        orden: 1,
+        idaYVuelta,
+      });
+    }
+  );
+
+  it('fija la cantidad de participantes en la de equipos realmente inscriptos', async () => {
+    listarEquiposMock.mockResolvedValue(equiposDe(5));
+
+    const resultado = await iniciarTorneo(1, USUARIO_ID);
+
+    expect(iniciarMock).toHaveBeenCalledWith(1, 5, expect.anything());
+    expect(resultado.torneo.cantidadParticipantes).toBe(5);
+  });
+
+  it('responde 404 y no inicia nada si el torneo no existe', async () => {
+    buscarMock.mockResolvedValue(null);
+
+    await expect(iniciarTorneo(1, USUARIO_ID)).rejects.toMatchObject({
+      statusCode: 404,
+    });
+    expect(iniciarMock).not.toHaveBeenCalled();
+  });
+
+  it('responde 404 y no inicia nada si el torneo es de otro organizador', async () => {
+    buscarMock.mockResolvedValue({ ...torneoLiga, creadorId: 99 });
+
+    await expect(iniciarTorneo(1, USUARIO_ID)).rejects.toMatchObject({
+      statusCode: 404,
+    });
+    expect(iniciarMock).not.toHaveBeenCalled();
+  });
+
+  it.each(['en_curso', 'finalizado', 'cancelado'] as const)(
+    'responde 409 y no inicia nada si el torneo está %s',
+    async (estado) => {
+      buscarMock.mockResolvedValue({ ...torneoLiga, estado });
+
+      await expect(iniciarTorneo(1, USUARIO_ID)).rejects.toMatchObject({
+        statusCode: 409,
+      });
+      expect(iniciarMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([0, 1])(
+    'responde 409 y no inicia nada con %i equipos inscriptos',
+    async (cantidad) => {
+      listarEquiposMock.mockResolvedValue(equiposDe(cantidad));
+
+      await expect(iniciarTorneo(1, USUARIO_ID)).rejects.toMatchObject({
+        statusCode: 409,
+      });
+      expect(iniciarMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it('inicia con 2 equipos, el mínimo', async () => {
+    listarEquiposMock.mockResolvedValue(equiposDe(2));
+
+    await iniciarTorneo(1, USUARIO_ID);
+
+    expect(iniciarMock).toHaveBeenCalledWith(1, 2, expect.anything());
+  });
+
+  it('en grupos_eliminatorias responde 409 si algún equipo no tiene grupo', async () => {
+    buscarMock.mockResolvedValue(torneoGrupos);
+    listarEquiposMock.mockResolvedValue([
+      ...equiposDe(7, 1),
+      { id: 8, torneoId: 1, nombre: 'Equipo 8', grupo: null, integrantes: [] },
+    ]);
+
+    await expect(iniciarTorneo(1, USUARIO_ID)).rejects.toMatchObject({
+      statusCode: 409,
+    });
+    expect(iniciarMock).not.toHaveBeenCalled();
+  });
+
+  it('en grupos_eliminatorias responde 400 si los equipos inscriptos no alcanzan para los grupos', async () => {
+    buscarMock.mockResolvedValue({ ...torneoGrupos, cantidadGrupos: 4 });
+    listarEquiposMock.mockResolvedValue(equiposDe(5, 1));
+
+    await expect(iniciarTorneo(1, USUARIO_ID)).rejects.toMatchObject({
+      statusCode: 400,
+    });
+    expect(iniciarMock).not.toHaveBeenCalled();
+  });
+
+  it('en otros formatos no exige grupos', async () => {
+    listarEquiposMock.mockResolvedValue(equiposDe(4, null));
+
+    await expect(iniciarTorneo(1, USUARIO_ID)).resolves.toBeDefined();
   });
 });

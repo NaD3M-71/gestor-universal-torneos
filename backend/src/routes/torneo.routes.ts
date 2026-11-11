@@ -3,6 +3,7 @@ import {
   actualizar,
   crear,
   eliminar,
+  iniciar,
   listar,
   obtener,
   cancelar,
@@ -39,6 +40,7 @@ router.patch(
   actualizar
 );
 router.patch('/:id/cancelar', autenticar, cancelar);
+router.patch('/:id/iniciar', validarIdTorneo, handleInputErrors, iniciar);
 router.delete('/:id', validarIdTorneo, handleInputErrors, eliminar);
 
 export default router;

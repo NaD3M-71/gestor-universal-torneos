@@ -12,6 +12,7 @@ export default defineConfig({
       '@controllers': ruta('./src/controllers'),
       '@repositories': ruta('./src/infrastructure/repositories'),
       '@config': ruta('./src/config'),
+      '@middlewares': ruta('./src/middlewares'),
       // Solo enums: '@prisma' completo taparía @prisma/adapter-pg y otros.
       '@prisma/enums': ruta('./src/infrastructure/database/prisma/enums.ts'),
     },

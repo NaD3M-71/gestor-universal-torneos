@@ -4,6 +4,7 @@ import {
   cancelarTorneo,
   crearTorneo,
   eliminarTorneo,
+  iniciarTorneo,
   listarTorneos,
   obtenerTorneo,
 } from '@services/torneos/torneo.service';
@@ -115,4 +116,17 @@ export const cancelar = async (req: Request, res: Response): Promise<void> => {
   const torneo = await cancelarTorneo(torneoIdDe(req), usuarioIdDe(req));
 
   res.status(200).json({ torneo });
+};
+
+/**
+ * PATCH /api/torneos/:id/iniciar
+ * Inicia el torneo y crea su primera fase. Responde 200 con { torneo, fase }.
+ */
+export const iniciar = async (req: Request, res: Response): Promise<void> => {
+  const { torneo, fase } = await iniciarTorneo(
+    torneoIdDe(req),
+    usuarioIdDe(req)
+  );
+
+  res.status(200).json({ torneo, fase });
 };
