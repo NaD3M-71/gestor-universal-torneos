@@ -10,10 +10,10 @@ import {
   obtenerTorneo,
   validarConfiguracion,
   type ConfiguracionTorneo,
-} from '@services/torneos/torneo.service';
-import type { ErrorValidacion } from '../../../src/middlewares/errors/ErrorValidacion';
-import type { EquipoPublico } from '../../../src/types/equipo';
-import type { TorneoPublico } from '../../../src/types/torneo';
+} from '@services/torneo.service';
+import type { ErrorValidacion } from '../../src/middlewares/errors/ErrorValidacion';
+import type { EquipoPublico } from '../../src/types/equipo';
+import type { TorneoPublico } from '../../src/types/torneo';
 
 // Se reemplazan los repositorios para no necesitar una base de datos.
 vi.mock('@repositories/equipo.repository', () => ({
@@ -487,11 +487,12 @@ describe('iniciarTorneo', () => {
 
       await iniciarTorneo(1, USUARIO_ID);
 
-      expect(iniciarMock).toHaveBeenCalledWith(1, 8, {
-        tipo,
-        orden: 1,
-        idaYVuelta,
-      });
+      expect(iniciarMock).toHaveBeenCalledWith(
+        1,
+        8,
+        { tipo, orden: 1, idaYVuelta },
+        expect.any(Array)
+      );
     }
   );
 
@@ -500,7 +501,12 @@ describe('iniciarTorneo', () => {
 
     const resultado = await iniciarTorneo(1, USUARIO_ID);
 
-    expect(iniciarMock).toHaveBeenCalledWith(1, 5, expect.anything());
+    expect(iniciarMock).toHaveBeenCalledWith(
+      1,
+      5,
+      expect.anything(),
+      expect.any(Array)
+    );
     expect(resultado.torneo.cantidadParticipantes).toBe(5);
   });
 
@@ -551,7 +557,12 @@ describe('iniciarTorneo', () => {
 
     await iniciarTorneo(1, USUARIO_ID);
 
-    expect(iniciarMock).toHaveBeenCalledWith(1, 2, expect.anything());
+    expect(iniciarMock).toHaveBeenCalledWith(
+      1,
+      2,
+      expect.anything(),
+      expect.any(Array)
+    );
   });
 
   it('en grupos_eliminatorias responde 409 si algún equipo no tiene grupo', async () => {
@@ -581,5 +592,132 @@ describe('iniciarTorneo', () => {
     listarEquiposMock.mockResolvedValue(equiposDe(4, null));
 
     await expect(iniciarTorneo(1, USUARIO_ID)).resolves.toBeDefined();
+  });
+
+  describe('generación de enfrentamientos de liga', () => {
+    /** Enfrentamientos con los que el service llamó al repositorio. */
+    const enfrentamientosGenerados = () => iniciarMock.mock.calls[0]?.[3] ?? [];
+
+    /** Instancias distintas, en orden de aparición. */
+    const instanciasDe = (enfrentamientos: { instancia: string }[]) => [
+      ...new Set(enfrentamientos.map((e) => e.instancia)),
+    ];
+
+    const iniciarConFormato = async (
+      formato: TorneoPublico['formato'],
+      cantidadEquipos: number
+    ) => {
+      buscarMock.mockResolvedValue({ ...torneoLiga, formato });
+      listarEquiposMock.mockResolvedValue(equiposDe(cantidadEquipos));
+
+      await iniciarTorneo(1, USUARIO_ID);
+
+      return enfrentamientosGenerados();
+    };
+
+    it('en liga_simple genera todos contra todos, con una fecha por ronda', async () => {
+      const enfrentamientos = await iniciarConFormato('liga_simple', 4);
+
+      expect(enfrentamientos).toHaveLength(6);
+      expect(instanciasDe(enfrentamientos)).toEqual([
+        'fecha_1',
+        'fecha_2',
+        'fecha_3',
+      ]);
+      expect(
+        enfrentamientos.filter((e) => e.instancia === 'fecha_1')
+      ).toHaveLength(2);
+    });
+
+    it('en liga_simple cada par de equipos se enfrenta una sola vez', async () => {
+      const enfrentamientos = await iniciarConFormato('liga_simple', 6);
+
+      const pares = enfrentamientos.map((e) =>
+        [e.equipoAId, e.equipoBId].sort((a, b) => a - b).join('-')
+      );
+
+      expect(enfrentamientos).toHaveLength(15);
+      expect(new Set(pares).size).toBe(15);
+    });
+
+    it('en una misma fecha ningún equipo juega dos veces', async () => {
+      const enfrentamientos = await iniciarConFormato('liga_simple', 8);
+
+      instanciasDe(enfrentamientos).forEach((instancia) => {
+        const ids = enfrentamientos
+          .filter((e) => e.instancia === instancia)
+          .flatMap((e) => [e.equipoAId, e.equipoBId]);
+
+        expect(new Set(ids).size).toBe(ids.length);
+      });
+    });
+
+    it('con cantidad impar de equipos hay una fecha más y uno descansa por fecha', async () => {
+      const enfrentamientos = await iniciarConFormato('liga_simple', 5);
+
+      expect(enfrentamientos).toHaveLength(10);
+      expect(instanciasDe(enfrentamientos)).toHaveLength(5);
+      instanciasDe(enfrentamientos).forEach((instancia) => {
+        expect(
+          enfrentamientos.filter((e) => e.instancia === instancia)
+        ).toHaveLength(2);
+      });
+    });
+
+    it('en liga_doble numera la vuelta a continuación de la ida, con local y visitante invertidos', async () => {
+      const enfrentamientos = await iniciarConFormato('liga_doble', 4);
+
+      expect(enfrentamientos).toHaveLength(12);
+      expect(instanciasDe(enfrentamientos)).toEqual([
+        'fecha_1',
+        'fecha_2',
+        'fecha_3',
+        'fecha_4',
+        'fecha_5',
+        'fecha_6',
+      ]);
+
+      const ida = enfrentamientos.filter((e) =>
+        ['fecha_1', 'fecha_2', 'fecha_3'].includes(e.instancia)
+      );
+      const vuelta = enfrentamientos.filter((e) =>
+        ['fecha_4', 'fecha_5', 'fecha_6'].includes(e.instancia)
+      );
+
+      ida.forEach((partido) => {
+        expect(vuelta).toContainEqual(
+          expect.objectContaining({
+            equipoAId: partido.equipoBId,
+            equipoBId: partido.equipoAId,
+          })
+        );
+      });
+    });
+
+    it('en liguilla_eliminacion genera solo la liga de ida', async () => {
+      const enfrentamientos = await iniciarConFormato(
+        'liguilla_eliminacion',
+        4
+      );
+
+      expect(enfrentamientos).toHaveLength(6);
+      expect(instanciasDe(enfrentamientos)).toHaveLength(3);
+    });
+
+    it.each(['eliminacion_simple', 'eliminacion_doble'] as const)(
+      'en %s no genera enfrentamientos todavía',
+      async (formato) => {
+        expect(await iniciarConFormato(formato, 4)).toEqual([]);
+      }
+    );
+
+    it('en grupos_eliminatorias no genera enfrentamientos todavía', async () => {
+      buscarMock.mockResolvedValue(torneoGrupos);
+      listarEquiposMock.mockResolvedValue(equiposDe(8, 1));
+
+      await iniciarTorneo(1, USUARIO_ID);
+
+      expect(enfrentamientosGenerados()).toEqual([]);
+    });
   });
 });

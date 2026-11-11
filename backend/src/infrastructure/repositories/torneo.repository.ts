@@ -3,7 +3,11 @@ import type {
   DatosNuevoTorneo,
   TorneoPublico,
 } from '../../types/torneo';
-import type { DatosNuevaFase, TorneoIniciado } from '../../types/fase';
+import type {
+  DatosNuevaFase,
+  DatosNuevoEnfrentamiento,
+  TorneoIniciado,
+} from '../../types/fase';
 import { prisma } from '../database';
 import { EstadoTorneo } from '@prisma/enums';
 
@@ -62,19 +66,28 @@ export const cambiarEstadoTorneo = (
 
 /**
  * Inicia un torneo: lo pasa a en_curso, fija la cantidad real de participantes
- * y crea su primera fase. Todo en una transacción, así no queda a medias.
+ * y crea su primera fase junto con sus enfrentamientos (si los hay). Todo en
+ * una transacción, así no queda a medias.
  */
 export const iniciarTorneo = async (
   id: number,
   cantidadParticipantes: number,
-  fase: DatosNuevaFase
+  fase: DatosNuevaFase,
+  enfrentamientos: DatosNuevoEnfrentamiento[] = []
 ): Promise<TorneoIniciado> => {
   const [torneo, faseCreada] = await prisma.$transaction([
     prisma.torneo.update({
       where: { id },
       data: { estado: EstadoTorneo.en_curso, cantidadParticipantes },
     }),
-    prisma.fase.create({ data: { torneoId: id, ...fase } }),
+    // Los enfrentamientos se crean anidados en la fase, que les pone su faseId.
+    prisma.fase.create({
+      data: {
+        torneoId: id,
+        ...fase,
+        enfrentamientos: { create: enfrentamientos },
+      },
+    }),
   ]);
 
   return { torneo, fase: faseCreada };
