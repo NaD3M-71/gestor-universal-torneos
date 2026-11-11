@@ -6,7 +6,12 @@ import type {
   DatosNuevoTorneo,
   TorneoPublico,
 } from '../../types/torneo';
-import type { DatosNuevaFase, TorneoIniciado } from '../../types/fase';
+import type {
+  DatosNuevaFase,
+  DatosNuevoEnfrentamiento,
+  TorneoIniciado,
+} from '../../types/fase';
+import { generarRoundRobin } from '@services/torneos/fixture/roundRobin.engine';
 import { AppError } from '@middlewares/errors/AppError';
 import {
   ErrorValidacion,
@@ -229,12 +234,28 @@ const FASE_INICIAL: Record<FormatoTorneo, DatosNuevaFase> = {
 };
 
 /**
+ * Arma los enfrentamientos de una fase de liga con el método todos contra
+ * todos. Cada fecha del fixture da una instancia: fecha_1, fecha_2, etc. En
+ * liga doble las fechas de la vuelta siguen numerándose a continuación.
+ */
+const generarEnfrentamientosDeLiga = (
+  equipoIds: number[],
+  idaYVuelta: boolean
+): DatosNuevoEnfrentamiento[] =>
+  generarRoundRobin(equipoIds, idaYVuelta).flatMap((fecha) =>
+    fecha.partidos.map((partido) => ({
+      ...partido,
+      instancia: `fecha_${fecha.numero}`,
+    }))
+  );
+
+/**
  * Inicia un torneo en borrador: lo pasa a en_curso (con lo que su
  * configuración queda bloqueada) y crea la primera fase según el formato.
  * Hacen falta al menos 2 equipos inscriptos. La cantidad de participantes pasa
  * a ser la de equipos realmente inscriptos. En grupos_eliminatorias, además,
- * todos los equipos tienen que tener grupo. Los enfrentamientos no se generan
- * acá.
+ * todos los equipos tienen que tener grupo. Si la primera fase es una liga, sus
+ * enfrentamientos se generan acá, en la misma transacción que la fase.
  */
 export const iniciarTorneo = async (
   id: number,
@@ -269,9 +290,19 @@ export const iniciarTorneo = async (
     cantidadGrupos: torneo.cantidadGrupos,
   });
 
+  const fase = FASE_INICIAL[torneo.formato];
+  const enfrentamientos =
+    fase.tipo === 'liga'
+      ? generarEnfrentamientosDeLiga(
+          equipos.map((equipo) => equipo.id),
+          fase.idaYVuelta
+        )
+      : [];
+
   return torneoRepository.iniciarTorneo(
     id,
     equipos.length,
-    FASE_INICIAL[torneo.formato]
+    fase,
+    enfrentamientos
   );
 };
