@@ -27,6 +27,16 @@ export interface DatosNuevaFase {
   idaYVuelta: boolean;
 }
 
+/**
+ * Datos para crear un enfrentamiento de una fase. La fase la completa el
+ * repositorio al crearlo junto con ella.
+ */
+export interface DatosNuevoEnfrentamiento {
+  equipoAId: number;
+  equipoBId: number;
+  instancia: string;
+}
+
 /** Resultado de iniciar un torneo: el torneo ya en curso y su primera fase. */
 export interface TorneoIniciado {
   torneo: TorneoPublico;

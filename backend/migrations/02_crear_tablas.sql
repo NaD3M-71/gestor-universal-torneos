@@ -16,7 +16,7 @@
 -- -----------------------------------------------------------------------------
 
 -- Ciclo de vida del torneo
-CREATE TYPE "EstadoTorneo" AS ENUM ('borrador', 'en_curso', 'finalizado');
+CREATE TYPE "EstadoTorneo" AS ENUM ('borrador', 'en_curso', 'finalizado', 'cancelado');
 
 -- Formato de competencia
 CREATE TYPE "FormatoTorneo" AS ENUM (
