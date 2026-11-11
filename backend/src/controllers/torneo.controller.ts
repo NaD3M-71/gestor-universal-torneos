@@ -7,7 +7,7 @@ import {
   iniciarTorneo,
   listarTorneos,
   obtenerTorneo,
-} from '@services/torneos/torneo.service';
+} from '@services/torneo.service';
 import type { DatosActualizarTorneo } from '../types/torneo';
 import { AppError } from '../middlewares/errors/AppError';
 

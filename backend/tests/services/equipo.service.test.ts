@@ -7,11 +7,11 @@ import {
   eliminarEquipo,
   listarEquipos,
   sortearGrupos,
-} from '@services/equipos/equipo.service';
-import { obtenerTorneo } from '@services/torneos/torneo.service';
-import { AppError } from '../../../src/middlewares/errors/AppError';
-import type { EquipoPublico } from '../../../src/types/equipo';
-import type { TorneoPublico } from '../../../src/types/torneo';
+} from '@services/equipo.service';
+import { obtenerTorneo } from '@services/torneo.service';
+import { AppError } from '../../src/middlewares/errors/AppError';
+import type { EquipoPublico } from '../../src/types/equipo';
+import type { TorneoPublico } from '../../src/types/torneo';
 
 // Se reemplazan el repositorio de equipos (sin base de datos) y la búsqueda de
 // torneos, que ya tiene sus propios tests.
@@ -25,7 +25,7 @@ vi.mock('@repositories/equipo.repository', () => ({
   existeEquipoConNombre: vi.fn(),
   reemplazarGrupos: vi.fn(),
 }));
-vi.mock('@services/torneos/torneo.service', () => ({
+vi.mock('@services/torneo.service', () => ({
   obtenerTorneo: vi.fn(),
 }));
 

@@ -6,7 +6,7 @@ import {
   eliminarEquipo,
   listarEquipos,
   sortearGrupos,
-} from '@services/equipos/equipo.service';
+} from '@services/equipo.service';
 import { AppError } from '../middlewares/errors/AppError';
 import type { AsignacionGrupo, DatosActualizarEquipo } from '../types/equipo';
 
