@@ -39,7 +39,6 @@
 
     // --- CONFIGURACIÓN DE ALIAS ---
     "paths": {
-      "@types/*": ["./src/types/*"],
       "@services/*": ["./src/services/*"],
       "@controllers/*": ["./src/controllers/*"],
       "@repositories/*": ["./src/infrastructure/repositories/*"],

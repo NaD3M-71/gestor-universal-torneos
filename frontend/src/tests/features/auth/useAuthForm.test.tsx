@@ -3,6 +3,7 @@ import { renderHook, act } from "@testing-library/react";
 import { useAuthForm } from "../../../features/auth/hooks/useAuthForm";
 import { AuthProvider } from "../../../features/auth";
 import { BrowserRouter } from "react-router-dom";
+import { waitFor } from "@testing-library/react";
 
 // SIMULACIÓN: Inventamos un "falso" sistema de autenticación para que el hook
 // no intente conectarse al backend real ni rompa durante la prueba
@@ -33,7 +34,7 @@ describe("Pruebas para el hook useAuthForm", () => {
    * Verifica que el hook inicialice correctamente las funciones de control
    * de react-hook-form tanto para 'login' como para 'register'.
    */
-  it("debe inicializarse correctamente y exponer las funciones del formulario", () => {
+  it("debe inicializarse correctamente y exponer las funciones del formulario", async () => {
     // Ejecutamos el hook simulando que estamos en la pantalla de 'login'
     const { result } = renderHook(() => useAuthForm("login"), { wrapper });
 
@@ -41,7 +42,9 @@ describe("Pruebas para el hook useAuthForm", () => {
     expect(result.current.handleSubmit).toBeDefined();
     expect(result.current.register).toBeDefined();
     expect(result.current.getInputClass).toBeDefined();
-    expect(result.current.isLoading).toBe(false);
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
   });
 
   /**
