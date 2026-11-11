@@ -6,6 +6,7 @@ import type {
   DatosNuevoTorneo,
   TorneoPublico,
 } from '../../types/torneo';
+import type { DatosNuevaFase, TorneoIniciado } from '../../types/fase';
 import { AppError } from '@middlewares/errors/AppError';
 import {
   ErrorValidacion,
@@ -211,4 +212,66 @@ export const cancelarTorneo = async (
 
   // Si está en borrador o en_curso, se permite cancelar lógicamente
   return await torneoRepository.cambiarEstadoTorneo(id, EstadoTorneo.cancelado);
+};
+
+const MINIMO_EQUIPOS_PARA_INICIAR = 2;
+
+// Primera fase que se crea al iniciar cada formato. La liga doble es una liga
+// con ida y vuelta, y la liguilla arranca con una liga de solo ida. Las fases
+// siguientes (eliminatoria, etc.) se crean al confirmar la fase anterior.
+const FASE_INICIAL: Record<FormatoTorneo, DatosNuevaFase> = {
+  liga_simple: { tipo: 'liga', orden: 1, idaYVuelta: false },
+  liga_doble: { tipo: 'liga', orden: 1, idaYVuelta: true },
+  eliminacion_simple: { tipo: 'eliminacion', orden: 1, idaYVuelta: false },
+  eliminacion_doble: { tipo: 'eliminacion', orden: 1, idaYVuelta: true },
+  liguilla_eliminacion: { tipo: 'liga', orden: 1, idaYVuelta: false },
+  grupos_eliminatorias: { tipo: 'grupos', orden: 1, idaYVuelta: false },
+};
+
+/**
+ * Inicia un torneo en borrador: lo pasa a en_curso (con lo que su
+ * configuración queda bloqueada) y crea la primera fase según el formato.
+ * Hacen falta al menos 2 equipos inscriptos. La cantidad de participantes pasa
+ * a ser la de equipos realmente inscriptos. En grupos_eliminatorias, además,
+ * todos los equipos tienen que tener grupo. Los enfrentamientos no se generan
+ * acá.
+ */
+export const iniciarTorneo = async (
+  id: number,
+  usuarioId: number
+): Promise<TorneoIniciado> => {
+  const torneo = await buscarTorneoPropio(id, usuarioId);
+  exigirBorrador(torneo, 'iniciar');
+
+  const equipos = await equipoRepository.listarEquiposDeTorneo(id);
+
+  if (equipos.length < MINIMO_EQUIPOS_PARA_INICIAR) {
+    throw new AppError(
+      `Hacen falta al menos ${MINIMO_EQUIPOS_PARA_INICIAR} equipos inscriptos para iniciar el torneo.`,
+      409
+    );
+  }
+
+  if (
+    torneo.formato === FormatoTorneo.grupos_eliminatorias &&
+    equipos.some((equipo) => equipo.grupo === null)
+  ) {
+    throw new AppError(
+      'Todos los equipos tienen que tener un grupo asignado para iniciar el torneo.',
+      409
+    );
+  }
+
+  // La configuración se vuelve a validar con la cantidad real de equipos.
+  validarConfiguracion({
+    formato: torneo.formato,
+    cantidadParticipantes: equipos.length,
+    cantidadGrupos: torneo.cantidadGrupos,
+  });
+
+  return torneoRepository.iniciarTorneo(
+    id,
+    equipos.length,
+    FASE_INICIAL[torneo.formato]
+  );
 };
