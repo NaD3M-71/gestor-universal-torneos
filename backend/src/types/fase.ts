@@ -37,6 +37,22 @@ export interface DatosNuevoEnfrentamiento {
   instancia: string;
 }
 
+/**
+ * Partido de un cuadro de eliminación listo para guardar. Los equipos pueden
+ * ser null (partido de una ronda futura, o bye sin rival). siguienteIndice es
+ * la posición, dentro de la misma lista, del partido al que pasa el ganador.
+ * Es un subconjunto de PartidoAsignado del bracket engine.
+ */
+export interface DatosNuevoPartidoBracket {
+  indice: number;
+  ronda: number;
+  instancia: string;
+  equipoAId: number | null;
+  equipoBId: number | null;
+  ganadorId: number | null;
+  siguienteIndice: number | null;
+}
+
 /** Resultado de iniciar un torneo: el torneo ya en curso y su primera fase. */
 export interface TorneoIniciado {
   torneo: TorneoPublico;

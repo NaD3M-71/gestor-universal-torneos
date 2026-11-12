@@ -13,6 +13,7 @@ import {
 } from '@services/torneo.service';
 import type { ErrorValidacion } from '../../src/middlewares/errors/ErrorValidacion';
 import type { EquipoPublico } from '../../src/types/equipo';
+import type { DatosNuevaFase } from '../../src/types/fase';
 import type { TorneoPublico } from '../../src/types/torneo';
 
 // Se reemplazan los repositorios para no necesitar una base de datos.
@@ -28,6 +29,7 @@ vi.mock('@repositories/torneo.repository', () => ({
   actualizarTorneo: vi.fn(),
   eliminarTorneo: vi.fn(),
   iniciarTorneo: vi.fn(),
+  iniciarTorneoConBracket: vi.fn(),
 }));
 
 const crearMock = vi.mocked(torneoRepository.crearTorneo);
@@ -36,6 +38,7 @@ const buscarMock = vi.mocked(torneoRepository.buscarTorneoPorId);
 const actualizarMock = vi.mocked(torneoRepository.actualizarTorneo);
 const eliminarMock = vi.mocked(torneoRepository.eliminarTorneo);
 const iniciarMock = vi.mocked(torneoRepository.iniciarTorneo);
+const iniciarBracketMock = vi.mocked(torneoRepository.iniciarTorneoConBracket);
 const contarEquiposMock = vi.mocked(equipoRepository.contarEquiposDeTorneo);
 const limpiarGruposMock = vi.mocked(equipoRepository.limpiarGrupos);
 const listarEquiposMock = vi.mocked(equipoRepository.listarEquiposDeTorneo);
@@ -436,11 +439,15 @@ describe('iniciarTorneo', () => {
   beforeEach(() => {
     buscarMock.mockResolvedValue(torneoLiga);
     listarEquiposMock.mockResolvedValue(equiposDe(8));
-    iniciarMock.mockImplementation(async (id, cantidadParticipantes, fase) => ({
+    const iniciada = (
+      id: number,
+      cantidadParticipantes: number,
+      fase: DatosNuevaFase
+    ) => ({
       torneo: {
         ...torneoLiga,
         id,
-        estado: 'en_curso',
+        estado: 'en_curso' as const,
         cantidadParticipantes,
       },
       fase: {
@@ -451,7 +458,13 @@ describe('iniciarTorneo', () => {
         comentarioDesempate: null,
         ...fase,
       },
-    }));
+    });
+    iniciarMock.mockImplementation(async (id, cantidad, fase) =>
+      iniciada(id, cantidad, fase)
+    );
+    iniciarBracketMock.mockImplementation(async (id, cantidad, fase) =>
+      iniciada(id, cantidad, fase)
+    );
   });
 
   it('inicia un torneo en borrador y devuelve el torneo en curso con su primera fase', async () => {
@@ -487,7 +500,11 @@ describe('iniciarTorneo', () => {
 
       await iniciarTorneo(1, USUARIO_ID);
 
-      expect(iniciarMock).toHaveBeenCalledWith(
+      // La eliminación simple guarda el cuadro con su propia función.
+      const llamado =
+        formato === 'eliminacion_simple' ? iniciarBracketMock : iniciarMock;
+
+      expect(llamado).toHaveBeenCalledWith(
         1,
         8,
         { tipo, orden: 1, idaYVuelta },
@@ -704,12 +721,9 @@ describe('iniciarTorneo', () => {
       expect(instanciasDe(enfrentamientos)).toHaveLength(3);
     });
 
-    it.each(['eliminacion_simple', 'eliminacion_doble'] as const)(
-      'en %s no genera enfrentamientos todavía',
-      async (formato) => {
-        expect(await iniciarConFormato(formato, 4)).toEqual([]);
-      }
-    );
+    it('en eliminacion_doble no genera enfrentamientos todavía', async () => {
+      expect(await iniciarConFormato('eliminacion_doble', 4)).toEqual([]);
+    });
 
     it('en grupos_eliminatorias no genera enfrentamientos todavía', async () => {
       buscarMock.mockResolvedValue(torneoGrupos);
@@ -718,6 +732,78 @@ describe('iniciarTorneo', () => {
       await iniciarTorneo(1, USUARIO_ID);
 
       expect(enfrentamientosGenerados()).toEqual([]);
+    });
+  });
+
+  describe('generación del cuadro de eliminación simple', () => {
+    /** Partidos con los que el service llamó al repositorio. */
+    const partidosGenerados = () => iniciarBracketMock.mock.calls[0]?.[3] ?? [];
+
+    const iniciarEliminacion = async (cantidadEquipos: number) => {
+      buscarMock.mockResolvedValue({
+        ...torneoLiga,
+        formato: 'eliminacion_simple',
+      });
+      listarEquiposMock.mockResolvedValue(equiposDe(cantidadEquipos));
+
+      await iniciarTorneo(1, USUARIO_ID);
+
+      return partidosGenerados();
+    };
+
+    it('con 8 equipos crea las 3 rondas (7 partidos) y no usa la creación de ligas', async () => {
+      const partidos = await iniciarEliminacion(8);
+
+      expect(partidos).toHaveLength(7);
+      expect(partidos.map((p) => p.instancia)).toEqual([
+        ...Array(4).fill('cuartos'),
+        ...Array(2).fill('semifinal'),
+        'final',
+      ]);
+      expect(iniciarMock).not.toHaveBeenCalled();
+    });
+
+    it('ubica a los 8 equipos una sola vez en la primera ronda y deja vacías las siguientes', async () => {
+      const partidos = await iniciarEliminacion(8);
+
+      const primeraRonda = partidos.filter((p) => p.ronda === 1);
+      const ids = primeraRonda.flatMap((p) => [p.equipoAId, p.equipoBId]);
+
+      expect(new Set(ids).size).toBe(8);
+      partidos
+        .filter((p) => p.ronda > 1)
+        .forEach((p) => {
+          expect(p.equipoAId).toBeNull();
+          expect(p.equipoBId).toBeNull();
+          expect(p.ganadorId).toBeNull();
+        });
+    });
+
+    it('con 6 equipos hay 2 byes: ganador automático y equipo ya promovido a la ronda siguiente', async () => {
+      const partidos = await iniciarEliminacion(6);
+
+      const byes = partidos.filter(
+        (p) => p.ronda === 1 && p.equipoBId === null
+      );
+      expect(byes).toHaveLength(2);
+
+      byes.forEach((bye) => {
+        expect(bye.ganadorId).toBe(bye.equipoAId);
+        const siguiente = partidos[bye.siguienteIndice ?? -1];
+        expect([siguiente?.equipoAId, siguiente?.equipoBId]).toContain(
+          bye.ganadorId
+        );
+      });
+    });
+
+    it('en cada ronda siguiente, los partidos encadenados apuntan al partido que sigue', async () => {
+      const partidos = await iniciarEliminacion(4);
+
+      const final = partidos.find((p) => p.instancia === 'final');
+      expect(final?.siguienteIndice).toBeNull();
+      partidos
+        .filter((p) => p.instancia === 'semifinal')
+        .forEach((p) => expect(p.siguienteIndice).toBe(final?.indice));
     });
   });
 });
