@@ -2,7 +2,9 @@ import type {
   EnfrentamientoConFase,
   EnfrentamientoPublico,
   PromocionAlSiguiente,
+  PromocionDeSerie,
   ResultadoEnfrentamiento,
+  SiguienteDeSerie,
   SiguienteEnfrentamiento,
 } from '../../types/enfrentamiento';
 import { prisma } from '../database';
@@ -21,14 +23,17 @@ const seleccionEnfrentamiento = {
 } as const;
 
 /** Busca un enfrentamiento con los datos de su fase. Devuelve null si no existe. */
-export const buscarEnfrentamientoConFase = (
+export const buscarEnfrentamientoConFase = async (
   id: number
-): Promise<EnfrentamientoConFase | null> =>
-  prisma.enfrentamiento.findUnique({
+): Promise<EnfrentamientoConFase | null> => {
+  const enfrentamiento = await prisma.enfrentamiento.findUnique({
     where: { id },
     select: {
       ...seleccionEnfrentamiento,
       siguienteId: true,
+      vueltaDeId: true,
+      // Una ida es el partido al que apunta alguna vuelta.
+      _count: { select: { vueltasEnfrentamiento: true } },
       fase: {
         select: {
           id: true,
@@ -40,6 +45,14 @@ export const buscarEnfrentamientoConFase = (
       },
     },
   });
+
+  if (enfrentamiento === null) {
+    return null;
+  }
+
+  const { _count, ...datos } = enfrentamiento;
+  return { ...datos, tieneVuelta: _count.vueltasEnfrentamiento > 0 };
+};
 
 /** Guarda el resultado de un enfrentamiento (carga o corrección). */
 export const guardarResultado = (
@@ -105,6 +118,83 @@ export const guardarResultadoConPromocion = async (
         promocion.lado === 'A'
           ? { equipoAId: promocion.equipoId }
           : { equipoBId: promocion.equipoId },
+    }),
+  ]);
+
+  return enfrentamiento;
+};
+
+const tieneResultado = (partido: {
+  resultadoA: number | null;
+  resultadoB: number | null;
+  ganadorId: number | null;
+}): boolean =>
+  partido.resultadoA !== null ||
+  partido.resultadoB !== null ||
+  partido.ganadorId !== null;
+
+/**
+ * Cruce siguiente de una eliminatoria a ida y vuelta, a partir de su ida (a la
+ * que apunta la vuelta del cruce anterior). Devuelve null si no existe o no
+ * tiene vuelta.
+ */
+export const buscarSiguienteDeSerie = async (
+  idaId: number
+): Promise<SiguienteDeSerie | null> => {
+  const seleccionResultado = {
+    id: true,
+    resultadoA: true,
+    resultadoB: true,
+    ganadorId: true,
+  } as const;
+
+  const ida = await prisma.enfrentamiento.findUnique({
+    where: { id: idaId },
+    select: {
+      ...seleccionResultado,
+      previosEnfrentamientos: { select: { id: true }, orderBy: { id: 'asc' } },
+      vueltasEnfrentamiento: { select: seleccionResultado, take: 1 },
+    },
+  });
+  const vuelta = ida?.vueltasEnfrentamiento[0];
+
+  if (ida === null || vuelta === undefined) {
+    return null;
+  }
+
+  return {
+    idaId: ida.id,
+    vueltaId: vuelta.id,
+    alimentadoresIds: ida.previosEnfrentamientos.map((previo) => previo.id),
+    jugado: tieneResultado(ida) || tieneResultado(vuelta),
+  };
+};
+
+/**
+ * Guarda el resultado de una vuelta y, en la misma transacción, ubica al
+ * equipo que avanza en el cruce siguiente: en la ida del lado indicado y en la
+ * vuelta del lado contrario.
+ */
+export const guardarResultadoConPromocionDeSerie = async (
+  id: number,
+  resultado: ResultadoEnfrentamiento,
+  promocion: PromocionDeSerie
+): Promise<EnfrentamientoPublico> => {
+  const { idaId, vueltaId, lado, equipoId } = promocion;
+
+  const [enfrentamiento] = await prisma.$transaction([
+    prisma.enfrentamiento.update({
+      where: { id },
+      data: resultado,
+      select: seleccionEnfrentamiento,
+    }),
+    prisma.enfrentamiento.update({
+      where: { id: idaId },
+      data: lado === 'A' ? { equipoAId: equipoId } : { equipoBId: equipoId },
+    }),
+    prisma.enfrentamiento.update({
+      where: { id: vueltaId },
+      data: lado === 'A' ? { equipoBId: equipoId } : { equipoAId: equipoId },
     }),
   ]);
 

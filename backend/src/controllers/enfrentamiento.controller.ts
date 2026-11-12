@@ -23,7 +23,9 @@ const aNumero = (valor: unknown): number | undefined =>
  * Carga o corrige el resultado de un enfrentamiento: un ganador (ganadorId) o
  * empate: true, con marcador opcional (resultadoA y resultadoB juntos) y un
  * comentario opcional (por ejemplo, "Ganó X por penales"). En eliminación el
- * ganador es obligatorio.
+ * ganador es obligatorio. En eliminación a ida y vuelta: la ida lleva solo el
+ * marcador (resultadoA y resultadoB, sin ganador ni empate) y la vuelta lleva
+ * ganadorId, que es quien avanza en la serie.
  * Responde 200 con { enfrentamiento }.
  */
 export const cargar = async (req: Request, res: Response): Promise<void> => {

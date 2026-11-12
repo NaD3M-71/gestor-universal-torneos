@@ -11,15 +11,22 @@ import type {
   EnfrentamientoConFase,
   EnfrentamientoPublico,
   PromocionAlSiguiente,
+  PromocionDeSerie,
   ResultadoEnfrentamiento,
 } from '../types/enfrentamiento';
 
 const ESTADO_FASE_ACTIVA = 'activa';
 const TIPO_FASE_ELIMINACION = 'eliminacion';
 
+const MENSAJE_GANADOR_O_EMPATE =
+  'Indicá el ganador o marcá empate (una sola de las dos).';
+
 /**
  * Valida las reglas del cuerpo que cruzan varios campos:
- * - Hay que elegir un ganador o marcar empate, pero no las dos cosas.
+ * - Hay que elegir un ganador o marcar empate, pero no las dos cosas. Un
+ *   cuerpo con solo el marcador también pasa: es la forma de cargar la ida de
+ *   una serie. Si el partido no es una ida, cargarResultado lo rechaza después
+ *   con exigirGanadorOEmpate.
  * - El marcador va completo (los dos lados) o no va.
  * El marcador no se compara con el ganador: en algunas disciplinas (golf) gana
  * el menor puntaje. Si hay algún error lanza un ErrorValidacion (400).
@@ -28,12 +35,14 @@ export const validarDatosResultado = (datos: DatosResultado): void => {
   const detalles: DetalleValidacion[] = [];
   const hayGanador = datos.ganadorId !== undefined;
   const hayEmpate = datos.empate === true;
+  const hayMarcador =
+    datos.resultadoA !== undefined && datos.resultadoB !== undefined;
 
-  if (hayGanador === hayEmpate) {
-    detalles.push({
-      campo: 'ganadorId',
-      mensaje: 'Indicá el ganador o marcá empate (una sola de las dos).',
-    });
+  if (
+    (hayGanador && hayEmpate) ||
+    (!hayGanador && !hayEmpate && !hayMarcador)
+  ) {
+    detalles.push({ campo: 'ganadorId', mensaje: MENSAJE_GANADOR_O_EMPATE });
   }
 
   if ((datos.resultadoA === undefined) !== (datos.resultadoB === undefined)) {
@@ -81,6 +90,40 @@ const armarResultado = (datos: DatosResultado): ResultadoEnfrentamiento => {
   };
 };
 
+/** Los partidos que no son la ida de una serie exigen ganador o empate (400). */
+const exigirGanadorOEmpate = (datos: DatosResultado): void => {
+  if (datos.ganadorId === undefined && datos.empate !== true) {
+    throw new ErrorValidacion([
+      { campo: 'ganadorId', mensaje: MENSAJE_GANADOR_O_EMPATE },
+    ]);
+  }
+};
+
+/**
+ * Carga o corrige la ida de una serie: solo su marcador, sin ganador ni
+ * empate (quien avanza se indica al cargar la vuelta). Es informativo y no
+ * promueve a nadie.
+ */
+const cargarIda = async (
+  enfrentamientoId: number,
+  datos: DatosResultado
+): Promise<EnfrentamientoPublico> => {
+  if (datos.ganadorId !== undefined || datos.empate === true) {
+    throw new ErrorValidacion([
+      {
+        campo: 'ganadorId',
+        mensaje:
+          'En la ida solo se carga el marcador: quien avanza se indica al cargar la vuelta.',
+      },
+    ]);
+  }
+
+  return enfrentamientoRepository.guardarResultado(
+    enfrentamientoId,
+    armarResultado(datos)
+  );
+};
+
 /**
  * Qué hay que hacer en el partido siguiente al cargar el ganador de uno de
  * eliminación: ubicarlo como equipo A o B según el orden de id de los dos
@@ -123,6 +166,45 @@ const armarPromocion = async (
 };
 
 /**
+ * Igual que armarPromocion, pero para la vuelta de una serie: quien avanza se
+ * ubica en la ida del cruce siguiente (como equipo A o B según el orden de id
+ * de los dos partidos que la alimentan) y, con el lado invertido, en su vuelta.
+ * Devuelve null si no hay nada que promover (es la final, o quien avanza no
+ * cambió y solo se corrige el marcador). Si el cruce siguiente ya tiene
+ * algún resultado, no se puede cambiar quién avanza (409).
+ */
+const armarPromocionDeSerie = async (
+  vuelta: EnfrentamientoConFase,
+  ganadorId: number
+): Promise<PromocionDeSerie | null> => {
+  if (vuelta.siguienteId === null || vuelta.ganadorId === ganadorId) {
+    return null;
+  }
+
+  const siguiente = await enfrentamientoRepository.buscarSiguienteDeSerie(
+    vuelta.siguienteId
+  );
+
+  if (siguiente === null) {
+    throw new AppError('No se encontró el cruce siguiente del cuadro.', 500);
+  }
+
+  if (siguiente.jugado) {
+    throw new AppError(
+      'No se puede cambiar quién avanza: el cruce siguiente ya tiene resultado. Corregí primero ese resultado.',
+      409
+    );
+  }
+
+  return {
+    idaId: siguiente.idaId,
+    vueltaId: siguiente.vueltaId,
+    lado: siguiente.alimentadoresIds[0] === vuelta.id ? 'A' : 'B',
+    equipoId: ganadorId,
+  };
+};
+
+/**
  * Carga o corrige el resultado de un enfrentamiento (volver a cargar
  * sobrescribe el anterior). Solo se puede con el torneo en curso y la fase
  * del enfrentamiento activa. El enfrentamiento tiene que ser del torneo de
@@ -133,6 +215,12 @@ const armarPromocion = async (
  * importar el sistema de puntuación) y pasa solo al partido siguiente, en la
  * misma transacción. Corregir al ganador se bloquea si el partido siguiente
  * ya tiene resultado.
+ *
+ * En una eliminación a ida y vuelta la ida solo lleva su marcador (sin ganador
+ * ni empate) y no promueve a nadie. En la vuelta el ganador es quien avanza en
+ * la serie, lo marca siempre el organizador (el marcador es informativo) y se
+ * promueve a la ida y a la vuelta del cruce siguiente. La vuelta no exige que
+ * la ida tenga marcador: así una final se puede jugar a partido único.
  */
 export const cargarResultado = async (
   torneoId: number,
@@ -186,16 +274,18 @@ export const cargarResultado = async (
     ]);
   }
 
-  if (enfrentamiento.fase.tipo === TIPO_FASE_ELIMINACION) {
-    // En ida y vuelta pasa quien gana el global (suma de los dos partidos), no
-    // el ganador de cada partido: esa carga y promoción son de la tarjeta 5.x.
-    if (enfrentamiento.fase.idaYVuelta) {
-      throw new AppError(
-        'La carga de resultados en eliminatorias con ida y vuelta todavía no está disponible.',
-        409
-      );
-    }
+  const esIda =
+    enfrentamiento.fase.tipo === TIPO_FASE_ELIMINACION &&
+    enfrentamiento.fase.idaYVuelta &&
+    enfrentamiento.tieneVuelta;
 
+  if (esIda) {
+    return cargarIda(enfrentamientoId, datos);
+  }
+
+  exigirGanadorOEmpate(datos);
+
+  if (enfrentamiento.fase.tipo === TIPO_FASE_ELIMINACION) {
     const ganadorId = datos.ganadorId;
 
     if (datos.empate === true || ganadorId === undefined) {
@@ -203,6 +293,25 @@ export const cargarResultado = async (
         'En una eliminatoria no hay empates: indicá un ganador.',
         409
       );
+    }
+
+    // Vuelta de una serie: el ganador avanza a la ida y a la vuelta siguientes.
+    if (enfrentamiento.vueltaDeId !== null) {
+      const promocionDeSerie = await armarPromocionDeSerie(
+        enfrentamiento,
+        ganadorId
+      );
+
+      return promocionDeSerie === null
+        ? enfrentamientoRepository.guardarResultado(
+            enfrentamientoId,
+            armarResultado(datos)
+          )
+        : enfrentamientoRepository.guardarResultadoConPromocionDeSerie(
+            enfrentamientoId,
+            armarResultado(datos),
+            promocionDeSerie
+          );
     }
 
     const promocion = await armarPromocion(enfrentamiento, ganadorId);

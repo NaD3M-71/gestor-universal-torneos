@@ -12,6 +12,7 @@ export const listarEnfrentamientosDeFase = (
       id: true,
       instancia: true,
       siguienteId: true,
+      vueltaDeId: true,
       resultadoA: true,
       resultadoB: true,
       ganadorId: true,

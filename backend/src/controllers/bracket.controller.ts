@@ -13,7 +13,9 @@ const usuarioIdDe = (req: Request): number => {
 /**
  * GET /api/torneos/:torneoId/bracket?faseId=
  * Cuadro de una fase de eliminación: rondas de la primera a la final, cada una
- * con sus partidos. Sin faseId usa la fase activa. Responde 200 con { bracket }.
+ * con sus partidos (partidos) o, si la fase es a ida y vuelta (idaYVuelta:
+ * true), con sus cruces ({ ida, vuelta, ganadorId }). Sin faseId usa la fase
+ * activa. Responde 200 con { bracket }.
  */
 export const obtener = async (req: Request, res: Response): Promise<void> => {
   const { faseId } = req.query;

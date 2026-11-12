@@ -20,6 +20,8 @@ vi.mock('@repositories/enfrentamiento.repository', () => ({
   guardarResultado: vi.fn(),
   buscarSiguiente: vi.fn(),
   guardarResultadoConPromocion: vi.fn(),
+  buscarSiguienteDeSerie: vi.fn(),
+  guardarResultadoConPromocionDeSerie: vi.fn(),
 }));
 vi.mock('@services/torneo.service', () => ({
   obtenerTorneo: vi.fn(),
@@ -32,6 +34,12 @@ const guardarMock = vi.mocked(enfrentamientoRepository.guardarResultado);
 const buscarSiguienteMock = vi.mocked(enfrentamientoRepository.buscarSiguiente);
 const guardarConPromocionMock = vi.mocked(
   enfrentamientoRepository.guardarResultadoConPromocion
+);
+const buscarSiguienteDeSerieMock = vi.mocked(
+  enfrentamientoRepository.buscarSiguienteDeSerie
+);
+const guardarConPromocionDeSerieMock = vi.mocked(
+  enfrentamientoRepository.guardarResultadoConPromocionDeSerie
 );
 const obtenerTorneoMock = vi.mocked(obtenerTorneo);
 
@@ -66,6 +74,8 @@ const enfrentamiento: EnfrentamientoConFase = {
   ganadorId: null,
   comentario: null,
   siguienteId: null,
+  vueltaDeId: null,
+  tieneVuelta: false,
   fase: {
     id: 3,
     torneoId: TORNEO_ID,
@@ -113,6 +123,10 @@ describe('validarDatosResultado', () => {
       { ganadorId: EQUIPO_A, resultadoA: 2, resultadoB: 1 },
     ],
     ['un empate con marcador', { empate: true, resultadoA: 1, resultadoB: 1 }],
+    [
+      'solo el marcador (la ida de una serie)',
+      { resultadoA: 2, resultadoB: 1 },
+    ],
   ] as [string, DatosResultado][])('acepta %s', (_, datos) => {
     expect(detallesDe(datos)).toEqual([]);
   });
@@ -247,6 +261,15 @@ describe('cargarResultado', () => {
       resultadoB: 0,
       comentario: null,
     });
+  });
+
+  it('responde 400 con solo el marcador: fuera de la ida de una serie hay que elegir ganador o empate', async () => {
+    await expect(
+      cargar({ resultadoA: 2, resultadoB: 1 })
+    ).rejects.toMatchObject({
+      detalles: [expect.objectContaining({ campo: 'ganadorId' })],
+    });
+    expect(guardarMock).not.toHaveBeenCalled();
   });
 
   it('responde 400 con un cuerpo inválido y no consulta nada', async () => {
@@ -507,15 +530,10 @@ describe('cargarResultado en una fase de eliminación', () => {
     expect(guardarConPromocionMock).not.toHaveBeenCalled();
   });
 
-  it('responde 409 en una eliminatoria con ida y vuelta: el pase se define por el global y no se promueve por partido', async () => {
-    buscarMock.mockResolvedValue({
-      ...partidoDeEliminacion,
-      fase: { ...partidoDeEliminacion.fase, idaYVuelta: true },
-    });
-
-    await expect(cargar({ ganadorId: EQUIPO_A })).rejects.toMatchObject({
-      statusCode: 409,
-    });
+  it('responde 400 con solo el marcador: en una eliminatoria de partido único el ganador es obligatorio', async () => {
+    await expect(
+      cargar({ resultadoA: 2, resultadoB: 1 })
+    ).rejects.toMatchObject({ statusCode: 400 });
     expect(guardarMock).not.toHaveBeenCalled();
     expect(guardarConPromocionMock).not.toHaveBeenCalled();
   });
@@ -573,6 +591,306 @@ describe('cargarResultado en una fase de eliminación', () => {
       });
       expect(buscarSiguienteMock).not.toHaveBeenCalled();
       expect(guardarConPromocionMock).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe('cargarResultado en una eliminatoria a ida y vuelta', () => {
+  const IDA_ID = 5;
+  const VUELTA_ID = 6;
+  const SIGUIENTE_IDA_ID = 20;
+  const SIGUIENTE_VUELTA_ID = 21;
+  const OTRO_ALIMENTADOR_ID = 8;
+
+  const faseDoble = {
+    id: 3,
+    torneoId: TORNEO_ID,
+    tipo: 'eliminacion',
+    estado: 'activa',
+    idaYVuelta: true,
+  };
+
+  // En la vuelta los lados vienen invertidos respecto de la ida.
+  const ida: EnfrentamientoConFase = {
+    ...enfrentamiento,
+    id: IDA_ID,
+    instancia: 'semifinal_ida',
+    tieneVuelta: true,
+    fase: faseDoble,
+  };
+  const vuelta: EnfrentamientoConFase = {
+    ...enfrentamiento,
+    id: VUELTA_ID,
+    equipoAId: EQUIPO_B,
+    equipoBId: EQUIPO_A,
+    instancia: 'semifinal_vuelta',
+    siguienteId: SIGUIENTE_IDA_ID,
+    vueltaDeId: IDA_ID,
+    fase: faseDoble,
+  };
+
+  const cargarEn = (id: number, datos: DatosResultado) =>
+    cargarResultado(TORNEO_ID, id, USUARIO_ID, datos);
+
+  beforeEach(() => {
+    buscarMock.mockImplementation(async (id) => (id === IDA_ID ? ida : vuelta));
+    buscarSiguienteDeSerieMock.mockResolvedValue({
+      idaId: SIGUIENTE_IDA_ID,
+      vueltaId: SIGUIENTE_VUELTA_ID,
+      alimentadoresIds: [OTRO_ALIMENTADOR_ID, VUELTA_ID],
+      jugado: false,
+    });
+    guardarConPromocionDeSerieMock.mockImplementation(
+      async (id, resultado) => ({ ...enfrentamiento, ...resultado, id })
+    );
+  });
+
+  describe('la ida', () => {
+    it('guarda solo el marcador, sin ganador, y no promueve a nadie', async () => {
+      await cargarEn(IDA_ID, { resultadoA: 2, resultadoB: 1 });
+
+      expect(guardarMock).toHaveBeenCalledWith(IDA_ID, {
+        ganadorId: null,
+        resultadoA: 2,
+        resultadoB: 1,
+        comentario: null,
+      });
+      expect(buscarSiguienteDeSerieMock).not.toHaveBeenCalled();
+      expect(guardarConPromocionDeSerieMock).not.toHaveBeenCalled();
+    });
+
+    it('guarda el comentario junto con el marcador', async () => {
+      await cargarEn(IDA_ID, {
+        resultadoA: 0,
+        resultadoB: 0,
+        comentario: 'Se suspendió por lluvia',
+      });
+
+      expect(guardarMock).toHaveBeenCalledWith(
+        IDA_ID,
+        expect.objectContaining({ comentario: 'Se suspendió por lluvia' })
+      );
+    });
+
+    it('volver a cargar sobrescribe el marcador anterior', async () => {
+      await cargarEn(IDA_ID, { resultadoA: 2, resultadoB: 1 });
+      await cargarEn(IDA_ID, { resultadoA: 3, resultadoB: 1 });
+
+      expect(guardarMock).toHaveBeenLastCalledWith(
+        IDA_ID,
+        expect.objectContaining({ resultadoA: 3, resultadoB: 1 })
+      );
+    });
+
+    it.each([
+      ['un ganador', { ganadorId: EQUIPO_A, resultadoA: 2, resultadoB: 1 }],
+      ['un empate', { empate: true }],
+    ] as [string, DatosResultado][])(
+      'responde 400 si se envía %s: quien avanza se indica en la vuelta',
+      async (_, datos) => {
+        await expect(cargarEn(IDA_ID, datos)).rejects.toMatchObject({
+          statusCode: 400,
+          detalles: [expect.objectContaining({ campo: 'ganadorId' })],
+        });
+        expect(guardarMock).not.toHaveBeenCalled();
+      }
+    );
+
+    it('responde 400 si no trae el marcador', async () => {
+      await expect(cargarEn(IDA_ID, {})).rejects.toMatchObject({
+        statusCode: 400,
+      });
+      expect(guardarMock).not.toHaveBeenCalled();
+    });
+
+    it('responde 409 si todavía no tiene definidos sus dos equipos', async () => {
+      buscarMock.mockResolvedValue({ ...ida, equipoAId: null });
+
+      await expect(
+        cargarEn(IDA_ID, { resultadoA: 1, resultadoB: 0 })
+      ).rejects.toMatchObject({ statusCode: 409 });
+      expect(guardarMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('la vuelta', () => {
+    it('guarda quien avanza y lo promueve a la ida y a la vuelta del cruce siguiente', async () => {
+      await cargarEn(VUELTA_ID, { ganadorId: EQUIPO_A });
+
+      expect(buscarSiguienteDeSerieMock).toHaveBeenCalledWith(SIGUIENTE_IDA_ID);
+      expect(guardarConPromocionDeSerieMock).toHaveBeenCalledWith(
+        VUELTA_ID,
+        {
+          ganadorId: EQUIPO_A,
+          resultadoA: null,
+          resultadoB: null,
+          comentario: null,
+        },
+        {
+          idaId: SIGUIENTE_IDA_ID,
+          vueltaId: SIGUIENTE_VUELTA_ID,
+          lado: 'B',
+          equipoId: EQUIPO_A,
+        }
+      );
+      expect(guardarMock).not.toHaveBeenCalled();
+    });
+
+    it('la vuelta de menor id de las dos que alimentan al cruce siguiente entra como equipo A', async () => {
+      buscarSiguienteDeSerieMock.mockResolvedValue({
+        idaId: SIGUIENTE_IDA_ID,
+        vueltaId: SIGUIENTE_VUELTA_ID,
+        alimentadoresIds: [VUELTA_ID, OTRO_ALIMENTADOR_ID],
+        jugado: false,
+      });
+
+      await cargarEn(VUELTA_ID, { ganadorId: EQUIPO_B });
+
+      expect(guardarConPromocionDeSerieMock).toHaveBeenCalledWith(
+        VUELTA_ID,
+        expect.anything(),
+        expect.objectContaining({ lado: 'A', equipoId: EQUIPO_B })
+      );
+    });
+
+    it('respeta al organizador aunque el marcador diga otra cosa, y guarda el comentario', async () => {
+      // La vuelta la juegan B (local) y A: el organizador marca a A.
+      await cargarEn(VUELTA_ID, {
+        ganadorId: EQUIPO_A,
+        resultadoA: 3,
+        resultadoB: 1,
+        comentario: 'Pasa A: en este juego gana el que menos puntos hace',
+      });
+
+      expect(guardarConPromocionDeSerieMock).toHaveBeenCalledWith(
+        VUELTA_ID,
+        {
+          ganadorId: EQUIPO_A,
+          resultadoA: 3,
+          resultadoB: 1,
+          comentario: 'Pasa A: en este juego gana el que menos puntos hace',
+        },
+        expect.anything()
+      );
+    });
+
+    it('no exige que la ida tenga marcador (final a partido único)', async () => {
+      await expect(
+        cargarEn(VUELTA_ID, { ganadorId: EQUIPO_A })
+      ).resolves.toBeDefined();
+
+      expect(buscarMock).toHaveBeenCalledTimes(1);
+      expect(buscarMock).toHaveBeenCalledWith(VUELTA_ID);
+    });
+
+    it('en la final guarda el resultado sin promover a nadie', async () => {
+      buscarMock.mockResolvedValue({ ...vuelta, siguienteId: null });
+
+      await cargarEn(VUELTA_ID, { ganadorId: EQUIPO_A });
+
+      expect(guardarMock).toHaveBeenCalledWith(
+        VUELTA_ID,
+        expect.objectContaining({ ganadorId: EQUIPO_A })
+      );
+      expect(buscarSiguienteDeSerieMock).not.toHaveBeenCalled();
+      expect(guardarConPromocionDeSerieMock).not.toHaveBeenCalled();
+    });
+
+    it('responde 400 si el ganador no es uno de los dos equipos', async () => {
+      await expect(
+        cargarEn(VUELTA_ID, { ganadorId: 999 })
+      ).rejects.toMatchObject({ statusCode: 400 });
+      expect(guardarConPromocionDeSerieMock).not.toHaveBeenCalled();
+    });
+
+    it('responde 400 con solo el marcador: en la vuelta hay que indicar quien avanza', async () => {
+      await expect(
+        cargarEn(VUELTA_ID, { resultadoA: 1, resultadoB: 0 })
+      ).rejects.toMatchObject({
+        statusCode: 400,
+        detalles: [expect.objectContaining({ campo: 'ganadorId' })],
+      });
+      expect(guardarConPromocionDeSerieMock).not.toHaveBeenCalled();
+    });
+
+    it('responde 409 con un empate: en una eliminatoria siempre avanza alguien', async () => {
+      await expect(cargarEn(VUELTA_ID, { empate: true })).rejects.toMatchObject(
+        { statusCode: 409 }
+      );
+      expect(guardarMock).not.toHaveBeenCalled();
+      expect(guardarConPromocionDeSerieMock).not.toHaveBeenCalled();
+    });
+
+    it('responde 500 si no encuentra el cruce siguiente', async () => {
+      buscarSiguienteDeSerieMock.mockResolvedValue(null);
+
+      await expect(
+        cargarEn(VUELTA_ID, { ganadorId: EQUIPO_A })
+      ).rejects.toMatchObject({ statusCode: 500 });
+      expect(guardarConPromocionDeSerieMock).not.toHaveBeenCalled();
+    });
+
+    describe('corrección de quien avanza', () => {
+      beforeEach(() => {
+        buscarMock.mockResolvedValue({
+          ...vuelta,
+          ganadorId: EQUIPO_A,
+          resultadoA: 1,
+          resultadoB: 0,
+        });
+      });
+
+      it('cambia quien avanza y reemplaza al equipo promovido si el cruce siguiente no se jugó', async () => {
+        await cargarEn(VUELTA_ID, { ganadorId: EQUIPO_B });
+
+        expect(guardarConPromocionDeSerieMock).toHaveBeenCalledWith(
+          VUELTA_ID,
+          expect.objectContaining({ ganadorId: EQUIPO_B }),
+          {
+            idaId: SIGUIENTE_IDA_ID,
+            vueltaId: SIGUIENTE_VUELTA_ID,
+            lado: 'B',
+            equipoId: EQUIPO_B,
+          }
+        );
+      });
+
+      it('responde 409 si el cruce siguiente ya tiene resultado', async () => {
+        buscarSiguienteDeSerieMock.mockResolvedValue({
+          idaId: SIGUIENTE_IDA_ID,
+          vueltaId: SIGUIENTE_VUELTA_ID,
+          alimentadoresIds: [OTRO_ALIMENTADOR_ID, VUELTA_ID],
+          jugado: true,
+        });
+
+        await expect(
+          cargarEn(VUELTA_ID, { ganadorId: EQUIPO_B })
+        ).rejects.toMatchObject({ statusCode: 409 });
+        expect(guardarConPromocionDeSerieMock).not.toHaveBeenCalled();
+        expect(guardarMock).not.toHaveBeenCalled();
+      });
+
+      it('si quien avanza es el mismo, solo corrige el marcador aunque el cruce siguiente ya se haya jugado', async () => {
+        buscarSiguienteDeSerieMock.mockResolvedValue({
+          idaId: SIGUIENTE_IDA_ID,
+          vueltaId: SIGUIENTE_VUELTA_ID,
+          alimentadoresIds: [OTRO_ALIMENTADOR_ID, VUELTA_ID],
+          jugado: true,
+        });
+
+        await cargarEn(VUELTA_ID, {
+          ganadorId: EQUIPO_A,
+          resultadoA: 2,
+          resultadoB: 0,
+        });
+
+        expect(guardarMock).toHaveBeenCalledWith(
+          VUELTA_ID,
+          expect.objectContaining({ resultadoA: 2, resultadoB: 0 })
+        );
+        expect(buscarSiguienteDeSerieMock).not.toHaveBeenCalled();
+        expect(guardarConPromocionDeSerieMock).not.toHaveBeenCalled();
+      });
     });
   });
 });

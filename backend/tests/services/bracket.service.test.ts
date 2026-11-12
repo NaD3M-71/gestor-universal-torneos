@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as bracketRepository from '@repositories/bracket.repository';
 import * as posicionRepository from '@repositories/posicion.repository';
-import { armarRondas, obtenerBracket } from '@services/bracket.service';
+import {
+  armarRondas,
+  armarRondasIdaYVuelta,
+  obtenerBracket,
+} from '@services/bracket.service';
 import { obtenerTorneo } from '@services/torneo.service';
 import type { EnfrentamientoDeBracket } from '../../src/types/bracket';
 import type { FasePublica } from '../../src/types/fase';
@@ -39,6 +43,7 @@ const partido = (
   id,
   instancia,
   siguienteId,
+  vueltaDeId: null,
   resultadoA: null,
   resultadoB: null,
   ganadorId: null,
@@ -136,6 +141,146 @@ describe('armarRondas', () => {
   });
 });
 
+/**
+ * Cuadro de 4 equipos a ida y vuelta tal como lo guarda la creación: de la
+ * final hacia la primera ronda, la ida antes que su vuelta. Solo la vuelta
+ * apunta al cruce siguiente (a su ida) y a su propia ida.
+ */
+const cuadroDeCuatroIdaYVuelta = (): EnfrentamientoDeBracket[] => [
+  partido(1, 'final_ida', null),
+  partido(2, 'final_vuelta', null, { vueltaDeId: 1 }),
+  partido(3, 'semifinal_ida', null, { equipoA: equipo(1), equipoB: equipo(4) }),
+  partido(4, 'semifinal_vuelta', 1, {
+    vueltaDeId: 3,
+    equipoA: equipo(4),
+    equipoB: equipo(1),
+  }),
+  partido(5, 'semifinal_ida', null, { equipoA: equipo(2), equipoB: equipo(3) }),
+  partido(6, 'semifinal_vuelta', 1, {
+    vueltaDeId: 5,
+    equipoA: equipo(3),
+    equipoB: equipo(2),
+  }),
+];
+
+/** Cuadro de 3 equipos a ida y vuelta: la semifinal 1 es un bye del equipo 1. */
+const cuadroDeTresIdaYVuelta = (): EnfrentamientoDeBracket[] => [
+  partido(1, 'final_ida', null),
+  partido(2, 'final_vuelta', null, { vueltaDeId: 1 }),
+  partido(3, 'semifinal', 1, { equipoA: equipo(1), ganadorId: 1 }),
+  partido(4, 'semifinal_ida', null, { equipoA: equipo(2), equipoB: equipo(3) }),
+  partido(5, 'semifinal_vuelta', 1, {
+    vueltaDeId: 4,
+    equipoA: equipo(3),
+    equipoB: equipo(2),
+  }),
+];
+
+describe('armarRondasIdaYVuelta', () => {
+  it('sin enfrentamientos devuelve una lista vacía', () => {
+    expect(armarRondasIdaYVuelta([])).toEqual([]);
+  });
+
+  it('agrupa los cruces en rondas de la primera a la final, sin el sufijo de ida o vuelta', () => {
+    const rondas = armarRondasIdaYVuelta(cuadroDeCuatroIdaYVuelta());
+
+    expect(rondas.map((r) => [r.ronda, r.instancia])).toEqual([
+      [1, 'semifinal'],
+      [2, 'final'],
+    ]);
+    expect(
+      rondas.map((r) => r.cruces.map((c) => [c.ida.id, c.vuelta?.id ?? null]))
+    ).toEqual([
+      [
+        [3, 4],
+        [5, 6],
+      ],
+      [[1, 2]],
+    ]);
+  });
+
+  it('la ida no apunta a nadie y la vuelta apunta a la ida del cruce siguiente', () => {
+    const [semifinales] = armarRondasIdaYVuelta(cuadroDeCuatroIdaYVuelta());
+
+    semifinales?.cruces.forEach((cruce) => {
+      expect(cruce.ida.siguienteId).toBeNull();
+      expect(cruce.ida.ladoSiguiente).toBeNull();
+      expect(cruce.vuelta?.siguienteId).toBe(1);
+    });
+  });
+
+  it('de las dos vueltas que alimentan a la final, la de menor id entra como A y la otra como B', () => {
+    const [semifinales] = armarRondasIdaYVuelta(cuadroDeCuatroIdaYVuelta());
+
+    expect(semifinales?.cruces.map((c) => c.vuelta?.ladoSiguiente)).toEqual([
+      'A',
+      'B',
+    ]);
+  });
+
+  it('la ida y la vuelta de un cruce comparten su número en la ronda', () => {
+    const [semifinales] = armarRondasIdaYVuelta(cuadroDeCuatroIdaYVuelta());
+
+    expect(
+      semifinales?.cruces.map((c) => [
+        c.numeroEnRonda,
+        c.ida.numeroEnRonda,
+        c.vuelta?.numeroEnRonda,
+      ])
+    ).toEqual([
+      [1, 1, 1],
+      [2, 2, 2],
+    ]);
+  });
+
+  it('no depende del orden en que lleguen los enfrentamientos', () => {
+    const alReves = [...cuadroDeCuatroIdaYVuelta()].reverse();
+
+    expect(armarRondasIdaYVuelta(alReves)).toEqual(
+      armarRondasIdaYVuelta(cuadroDeCuatroIdaYVuelta())
+    );
+  });
+
+  it('quien avanza en el cruce es el ganador de la vuelta, y null mientras no se defina', () => {
+    const cuadro = cuadroDeCuatroIdaYVuelta();
+    const vuelta = cuadro.find((p) => p.id === 4);
+    if (vuelta) {
+      vuelta.ganadorId = 1;
+    }
+
+    const [semifinales] = armarRondasIdaYVuelta(cuadro);
+
+    expect(semifinales?.cruces.map((c) => c.ganadorId)).toEqual([1, null]);
+  });
+
+  it('un bye es un cruce de un solo partido: sin vuelta, con ganador y apuntando al siguiente', () => {
+    const [semifinales] = armarRondasIdaYVuelta(cuadroDeTresIdaYVuelta());
+    const [bye, normal] = semifinales?.cruces ?? [];
+
+    expect(semifinales?.instancia).toBe('semifinal');
+    expect(bye).toMatchObject({
+      vuelta: null,
+      ganadorId: 1,
+      ida: { id: 3, esBye: true, siguienteId: 1, ladoSiguiente: 'A' },
+    });
+    expect(normal).toMatchObject({
+      ida: { id: 4, esBye: false },
+      vuelta: { id: 5, siguienteId: 1, ladoSiguiente: 'B' },
+    });
+  });
+
+  it('con 2 equipos hay una sola ronda, la final', () => {
+    const rondas = armarRondasIdaYVuelta([
+      partido(1, 'final_ida', null),
+      partido(2, 'final_vuelta', null, { vueltaDeId: 1 }),
+    ]);
+
+    expect(rondas).toHaveLength(1);
+    expect(rondas[0]?.instancia).toBe('final');
+    expect(rondas[0]?.cruces[0]?.vuelta?.siguienteId).toBeNull();
+  });
+});
+
 describe('obtenerBracket', () => {
   const faseEliminacion: FasePublica = {
     id: 10,
@@ -221,12 +366,24 @@ describe('obtenerBracket', () => {
     });
   });
 
-  it('una fase sin partidos (eliminación doble, por ahora) devuelve rondas vacías', async () => {
+  it('una fase a ida y vuelta sin partidos devuelve rondas vacías', async () => {
     fasesMock.mockResolvedValue([{ ...faseEliminacion, idaYVuelta: true }]);
     enfrentamientosMock.mockResolvedValue([]);
 
     const bracket = await obtenerBracket(TORNEO_ID, USUARIO_ID);
 
     expect(bracket).toMatchObject({ idaYVuelta: true, rondas: [] });
+  });
+
+  it('una fase a ida y vuelta devuelve las rondas con cruces ida/vuelta', async () => {
+    fasesMock.mockResolvedValue([{ ...faseEliminacion, idaYVuelta: true }]);
+    enfrentamientosMock.mockResolvedValue(cuadroDeCuatroIdaYVuelta());
+
+    const bracket = await obtenerBracket(TORNEO_ID, USUARIO_ID);
+
+    expect(bracket.idaYVuelta).toBe(true);
+    if (bracket.idaYVuelta) {
+      expect(bracket.rondas.map((r) => r.cruces.length)).toEqual([2, 1]);
+    }
   });
 });
