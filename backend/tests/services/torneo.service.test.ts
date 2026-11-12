@@ -500,9 +500,8 @@ describe('iniciarTorneo', () => {
 
       await iniciarTorneo(1, USUARIO_ID);
 
-      // La eliminación simple guarda el cuadro con su propia función.
-      const llamado =
-        formato === 'eliminacion_simple' ? iniciarBracketMock : iniciarMock;
+      // La eliminación (simple o doble) guarda el cuadro con su propia función.
+      const llamado = tipo === 'eliminacion' ? iniciarBracketMock : iniciarMock;
 
       expect(llamado).toHaveBeenCalledWith(
         1,
@@ -721,10 +720,6 @@ describe('iniciarTorneo', () => {
       expect(instanciasDe(enfrentamientos)).toHaveLength(3);
     });
 
-    it('en eliminacion_doble no genera enfrentamientos todavía', async () => {
-      expect(await iniciarConFormato('eliminacion_doble', 4)).toEqual([]);
-    });
-
     it('en grupos_eliminatorias no genera enfrentamientos todavía', async () => {
       buscarMock.mockResolvedValue(torneoGrupos);
       listarEquiposMock.mockResolvedValue(equiposDe(8, 1));
@@ -804,6 +799,95 @@ describe('iniciarTorneo', () => {
       partidos
         .filter((p) => p.instancia === 'semifinal')
         .forEach((p) => expect(p.siguienteIndice).toBe(final?.indice));
+    });
+  });
+
+  describe('generación del cuadro de eliminación doble (ida y vuelta)', () => {
+    const partidosGenerados = () => iniciarBracketMock.mock.calls[0]?.[3] ?? [];
+
+    const iniciarEliminacionDoble = async (cantidadEquipos: number) => {
+      buscarMock.mockResolvedValue({
+        ...torneoLiga,
+        formato: 'eliminacion_doble',
+      });
+      listarEquiposMock.mockResolvedValue(equiposDe(cantidadEquipos));
+
+      await iniciarTorneo(1, USUARIO_ID);
+
+      return partidosGenerados();
+    };
+
+    it('con 4 equipos crea dos filas por cruce, final incluida (6 partidos)', async () => {
+      const partidos = await iniciarEliminacionDoble(4);
+
+      expect(partidos.map((p) => p.instancia)).toEqual([
+        'semifinal_ida',
+        'semifinal_vuelta',
+        'semifinal_ida',
+        'semifinal_vuelta',
+        'final_ida',
+        'final_vuelta',
+      ]);
+      expect(iniciarMock).not.toHaveBeenCalled();
+    });
+
+    it('cada vuelta apunta a su ida y tiene los equipos invertidos', async () => {
+      const partidos = await iniciarEliminacionDoble(4);
+
+      const vueltas = partidos.filter((p) => p.instancia.endsWith('_vuelta'));
+      expect(vueltas).toHaveLength(3);
+
+      vueltas.forEach((vuelta) => {
+        const ida = partidos[vuelta.vueltaDeIndice ?? -1];
+        expect(ida?.instancia.replace('_ida', '')).toBe(
+          vuelta.instancia.replace('_vuelta', '')
+        );
+        expect(ida?.indice).toBeLessThan(vuelta.indice);
+        expect(vuelta.equipoAId).toBe(ida?.equipoBId);
+        expect(vuelta.equipoBId).toBe(ida?.equipoAId);
+      });
+    });
+
+    it('solo la vuelta apunta al cruce siguiente, y lo hace a su ida', async () => {
+      const partidos = await iniciarEliminacionDoble(4);
+
+      partidos
+        .filter((p) => p.instancia.endsWith('_ida'))
+        .forEach((ida) => expect(ida.siguienteIndice).toBeNull());
+
+      const finalIda = partidos.find((p) => p.instancia === 'final_ida');
+      partidos
+        .filter((p) => p.instancia === 'semifinal_vuelta')
+        .forEach((vuelta) =>
+          expect(vuelta.siguienteIndice).toBe(finalIda?.indice)
+        );
+      const finalVuelta = partidos.find((p) => p.instancia === 'final_vuelta');
+      expect(finalVuelta?.siguienteIndice).toBeNull();
+    });
+
+    it('con 7 equipos el bye es una sola fila, con ganador automático y sin vuelta', async () => {
+      const partidos = await iniciarEliminacionDoble(7);
+
+      // 3 cruces de cuartos con dos filas + 1 bye + 2 semifinales + final
+      expect(partidos).toHaveLength(13);
+      const byes = partidos.filter((p) => p.instancia === 'cuartos');
+      expect(byes).toHaveLength(1);
+      expect(byes[0]?.equipoBId).toBeNull();
+      expect(byes[0]?.ganadorId).toBe(byes[0]?.equipoAId);
+      expect(byes[0]?.vueltaDeIndice).toBeNull();
+    });
+
+    it('el equipo con bye queda en la ida y, invertido, en la vuelta del cruce siguiente', async () => {
+      const partidos = await iniciarEliminacionDoble(7);
+
+      const bye = partidos.find((p) => p.instancia === 'cuartos');
+      const ida = partidos[bye?.siguienteIndice ?? -1];
+      const vuelta = partidos.find((p) => p.vueltaDeIndice === ida?.indice);
+
+      expect(ida?.instancia).toBe('semifinal_ida');
+      expect([ida?.equipoAId, ida?.equipoBId]).toContain(bye?.ganadorId);
+      expect(vuelta?.equipoAId).toBe(ida?.equipoBId);
+      expect(vuelta?.equipoBId).toBe(ida?.equipoAId);
     });
   });
 });

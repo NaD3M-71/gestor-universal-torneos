@@ -15,6 +15,7 @@ import type {
 import { generarRoundRobin } from '@services/fixture/roundRobin.engine';
 import {
   asignarEquipos,
+  expandirIdaYVuelta,
   generarBracket,
   sortearParticipantes,
 } from '@services/fixture/bracket.engine';
@@ -256,19 +257,25 @@ const generarEnfrentamientosDeLiga = (
   );
 
 /**
- * Arma el cuadro completo de una eliminatoria de partido único: todas las
- * rondas, con los equipos ubicados en la primera. Como al iniciar el torneo no
- * hay una fase previa que dé un ranking, el orden de las semillas se sortea
- * (y con él, quiénes reciben bye). Los partidos de las rondas siguientes
- * quedan sin equipos hasta que se carguen los resultados.
+ * Arma el cuadro completo de una eliminatoria: todas las rondas, con los
+ * equipos ubicados en la primera. Como al iniciar el torneo no hay una fase
+ * previa que dé un ranking, el orden de las semillas se sortea (y con él,
+ * quiénes reciben bye). Los partidos de las rondas siguientes quedan sin
+ * equipos hasta que se carguen los resultados. Con ida y vuelta cada cruce da
+ * dos filas (ida y vuelta, esta con los lados invertidos); el bye sigue siendo
+ * una sola fila.
  */
 const generarPartidosDeEliminacion = (
-  equipoIds: number[]
-): DatosNuevoPartidoBracket[] =>
-  asignarEquipos(
+  equipoIds: number[],
+  idaYVuelta: boolean
+): DatosNuevoPartidoBracket[] => {
+  const partidos = asignarEquipos(
     generarBracket(equipoIds.length),
     sortearParticipantes(equipoIds)
   );
+
+  return idaYVuelta ? expandirIdaYVuelta(partidos) : partidos;
+};
 
 /**
  * Inicia un torneo en borrador: lo pasa a en_curso (con lo que su
@@ -277,8 +284,8 @@ const generarPartidosDeEliminacion = (
  * a ser la de equipos realmente inscriptos. En grupos_eliminatorias, además,
  * todos los equipos tienen que tener grupo. Si la primera fase es una liga, sus
  * enfrentamientos se generan acá, en la misma transacción que la fase. Con
- * eliminación simple se genera el cuadro completo (todas las rondas); la
- * eliminación doble (ida y vuelta) todavía no genera partidos.
+ * eliminación se genera el cuadro completo (todas las rondas); en la doble
+ * (ida y vuelta) cada cruce tiene dos filas, incluida la final.
  */
 export const iniciarTorneo = async (
   id: number,
@@ -315,12 +322,15 @@ export const iniciarTorneo = async (
 
   const fase = FASE_INICIAL[torneo.formato];
 
-  if (fase.tipo === 'eliminacion' && !fase.idaYVuelta) {
+  if (fase.tipo === 'eliminacion') {
     return torneoRepository.iniciarTorneoConBracket(
       id,
       equipos.length,
       fase,
-      generarPartidosDeEliminacion(equipos.map((equipo) => equipo.id))
+      generarPartidosDeEliminacion(
+        equipos.map((equipo) => equipo.id),
+        fase.idaYVuelta
+      )
     );
   }
 
