@@ -8,11 +8,14 @@ import {
 } from '../middlewares/errors/ErrorValidacion';
 import type {
   DatosResultado,
+  EnfrentamientoConFase,
   EnfrentamientoPublico,
+  PromocionAlSiguiente,
   ResultadoEnfrentamiento,
 } from '../types/enfrentamiento';
 
 const ESTADO_FASE_ACTIVA = 'activa';
+const TIPO_FASE_ELIMINACION = 'eliminacion';
 
 /**
  * Valida las reglas del cuerpo que cruzan varios campos:
@@ -65,11 +68,57 @@ export const validarDatosResultado = (datos: DatosResultado): void => {
 const armarResultado = (datos: DatosResultado): ResultadoEnfrentamiento => {
   const esEmpate = datos.empate === true;
   const marcadorPorDefecto = esEmpate ? 0 : null;
+  // Un comentario vacío o solo con espacios se guarda como null. Como el
+  // marcador, volver a cargar el resultado sin comentario lo borra.
+  const comentario = datos.comentario?.trim();
 
   return {
     ganadorId: esEmpate ? null : (datos.ganadorId ?? null),
     resultadoA: datos.resultadoA ?? marcadorPorDefecto,
     resultadoB: datos.resultadoB ?? marcadorPorDefecto,
+    comentario:
+      comentario === undefined || comentario === '' ? null : comentario,
+  };
+};
+
+/**
+ * Qué hay que hacer en el partido siguiente al cargar el ganador de uno de
+ * eliminación: ubicarlo como equipo A o B según el orden de id de los dos
+ * partidos que alimentan al siguiente (el de menor id entra como A). Devuelve
+ * null si no hay nada que promover: es la final o el ganador no cambió (solo
+ * se corrige el marcador). Si el partido siguiente ya se jugó, no se puede
+ * cambiar al ganador: primero hay que corregir ese resultado (409).
+ */
+const armarPromocion = async (
+  enfrentamiento: EnfrentamientoConFase,
+  ganadorId: number
+): Promise<PromocionAlSiguiente | null> => {
+  if (
+    enfrentamiento.siguienteId === null ||
+    enfrentamiento.ganadorId === ganadorId
+  ) {
+    return null;
+  }
+
+  const siguiente = await enfrentamientoRepository.buscarSiguiente(
+    enfrentamiento.siguienteId
+  );
+
+  if (siguiente === null) {
+    throw new AppError('No se encontró el partido siguiente del cuadro.', 500);
+  }
+
+  if (siguiente.ganadorId !== null) {
+    throw new AppError(
+      'No se puede cambiar el ganador: el partido siguiente ya tiene resultado. Corregí primero ese resultado.',
+      409
+    );
+  }
+
+  return {
+    siguienteId: siguiente.id,
+    lado: siguiente.alimentadoresIds[0] === enfrentamiento.id ? 'A' : 'B',
+    equipoId: ganadorId,
   };
 };
 
@@ -79,6 +128,11 @@ const armarResultado = (datos: DatosResultado): ResultadoEnfrentamiento => {
  * del enfrentamiento activa. El enfrentamiento tiene que ser del torneo de
  * la URL y el torneo del organizador (404 si no). Con sistema de puntuación
  * ganada_perdida no hay empates.
+ *
+ * En una fase de eliminación el ganador es obligatorio (no hay empates, sin
+ * importar el sistema de puntuación) y pasa solo al partido siguiente, en la
+ * misma transacción. Corregir al ganador se bloquea si el partido siguiente
+ * ya tiene resultado.
  */
 export const cargarResultado = async (
   torneoId: number,
@@ -130,6 +184,39 @@ export const cargarResultado = async (
         mensaje: 'El ganador tiene que ser uno de los dos equipos del partido.',
       },
     ]);
+  }
+
+  if (enfrentamiento.fase.tipo === TIPO_FASE_ELIMINACION) {
+    // En ida y vuelta pasa quien gana el global (suma de los dos partidos), no
+    // el ganador de cada partido: esa carga y promoción son de la tarjeta 5.x.
+    if (enfrentamiento.fase.idaYVuelta) {
+      throw new AppError(
+        'La carga de resultados en eliminatorias con ida y vuelta todavía no está disponible.',
+        409
+      );
+    }
+
+    const ganadorId = datos.ganadorId;
+
+    if (datos.empate === true || ganadorId === undefined) {
+      throw new AppError(
+        'En una eliminatoria no hay empates: indicá un ganador.',
+        409
+      );
+    }
+
+    const promocion = await armarPromocion(enfrentamiento, ganadorId);
+
+    return promocion === null
+      ? enfrentamientoRepository.guardarResultado(
+          enfrentamientoId,
+          armarResultado(datos)
+        )
+      : enfrentamientoRepository.guardarResultadoConPromocion(
+          enfrentamientoId,
+          armarResultado(datos),
+          promocion
+        );
   }
 
   if (

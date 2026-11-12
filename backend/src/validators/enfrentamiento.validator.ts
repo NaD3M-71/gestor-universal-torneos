@@ -32,4 +32,12 @@ export const validarResultado = [
     .optional()
     .isInt({ min: 0 })
     .withMessage('El marcador debe ser un entero desde 0.'),
+  body('comentario')
+    .optional()
+    .isString()
+    .withMessage('El comentario debe ser un texto.')
+    .bail()
+    .trim()
+    .isLength({ max: 255 })
+    .withMessage('El comentario no puede superar los 255 caracteres.'),
 ];

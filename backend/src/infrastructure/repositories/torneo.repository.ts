@@ -6,6 +6,7 @@ import type {
 import type {
   DatosNuevaFase,
   DatosNuevoEnfrentamiento,
+  DatosNuevoPartidoBracket,
   TorneoIniciado,
 } from '../../types/fase';
 import { prisma } from '../database';
@@ -92,6 +93,56 @@ export const iniciarTorneo = async (
 
   return { torneo, fase: faseCreada };
 };
+
+/**
+ * Inicia un torneo cuya primera fase es una eliminatoria: igual que
+ * iniciarTorneo, pero guarda el cuadro completo (todas las rondas) con los
+ * partidos encadenados por siguienteId. Todo en una transacción.
+ */
+export const iniciarTorneoConBracket = (
+  id: number,
+  cantidadParticipantes: number,
+  fase: DatosNuevaFase,
+  partidos: DatosNuevoPartidoBracket[]
+): Promise<TorneoIniciado> =>
+  prisma.$transaction(async (tx) => {
+    const torneo = await tx.torneo.update({
+      where: { id },
+      data: { estado: EstadoTorneo.en_curso, cantidadParticipantes },
+    });
+    const faseCreada = await tx.fase.create({
+      data: { torneoId: id, ...fase },
+    });
+
+    // Se guarda de la final hacia la primera ronda, así cuando se crea un
+    // partido el que sigue ya tiene id. Dentro de cada ronda se mantiene el
+    // orden: de cada par, el de menor id es el que entra como equipo A al
+    // partido siguiente (el de mayor id entra como B).
+    const orden = [...partidos].sort(
+      (a, b) => b.ronda - a.ronda || a.indice - b.indice
+    );
+    const idPorIndice = new Map<number, number>();
+
+    for (const partido of orden) {
+      const creado = await tx.enfrentamiento.create({
+        data: {
+          faseId: faseCreada.id,
+          equipoAId: partido.equipoAId,
+          equipoBId: partido.equipoBId,
+          ganadorId: partido.ganadorId,
+          instancia: partido.instancia,
+          siguienteId:
+            partido.siguienteIndice === null
+              ? null
+              : (idPorIndice.get(partido.siguienteIndice) ?? null),
+        },
+        select: { id: true },
+      });
+      idPorIndice.set(partido.indice, creado.id);
+    }
+
+    return { torneo, fase: faseCreada };
+  });
 
 /**
  * Borra un torneo. La base elimina en cascada sus fases y sus equipos (y con

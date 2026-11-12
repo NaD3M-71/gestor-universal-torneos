@@ -21,11 +21,13 @@ const aNumero = (valor: unknown): number | undefined =>
 /**
  * PUT /api/torneos/:torneoId/enfrentamientos/:id/resultado
  * Carga o corrige el resultado de un enfrentamiento: un ganador (ganadorId) o
- * empate: true, con marcador opcional (resultadoA y resultadoB juntos).
+ * empate: true, con marcador opcional (resultadoA y resultadoB juntos) y un
+ * comentario opcional (por ejemplo, "Ganó X por penales"). En eliminación el
+ * ganador es obligatorio.
  * Responde 200 con { enfrentamiento }.
  */
 export const cargar = async (req: Request, res: Response): Promise<void> => {
-  const { ganadorId, empate, resultadoA, resultadoB } = req.body;
+  const { ganadorId, empate, resultadoA, resultadoB, comentario } = req.body;
 
   const enfrentamiento = await cargarResultado(
     torneoIdDe(req),
@@ -36,6 +38,7 @@ export const cargar = async (req: Request, res: Response): Promise<void> => {
       empate,
       resultadoA: aNumero(resultadoA),
       resultadoB: aNumero(resultadoB),
+      comentario,
     }
   );
 

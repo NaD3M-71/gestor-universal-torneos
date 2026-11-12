@@ -9,9 +9,15 @@ import type {
 import type {
   DatosNuevaFase,
   DatosNuevoEnfrentamiento,
+  DatosNuevoPartidoBracket,
   TorneoIniciado,
 } from '../types/fase';
 import { generarRoundRobin } from '@services/fixture/roundRobin.engine';
+import {
+  asignarEquipos,
+  generarBracket,
+  sortearParticipantes,
+} from '@services/fixture/bracket.engine';
 import { AppError } from '@middlewares/errors/AppError';
 import {
   ErrorValidacion,
@@ -250,12 +256,29 @@ const generarEnfrentamientosDeLiga = (
   );
 
 /**
+ * Arma el cuadro completo de una eliminatoria de partido único: todas las
+ * rondas, con los equipos ubicados en la primera. Como al iniciar el torneo no
+ * hay una fase previa que dé un ranking, el orden de las semillas se sortea
+ * (y con él, quiénes reciben bye). Los partidos de las rondas siguientes
+ * quedan sin equipos hasta que se carguen los resultados.
+ */
+const generarPartidosDeEliminacion = (
+  equipoIds: number[]
+): DatosNuevoPartidoBracket[] =>
+  asignarEquipos(
+    generarBracket(equipoIds.length),
+    sortearParticipantes(equipoIds)
+  );
+
+/**
  * Inicia un torneo en borrador: lo pasa a en_curso (con lo que su
  * configuración queda bloqueada) y crea la primera fase según el formato.
  * Hacen falta al menos 2 equipos inscriptos. La cantidad de participantes pasa
  * a ser la de equipos realmente inscriptos. En grupos_eliminatorias, además,
  * todos los equipos tienen que tener grupo. Si la primera fase es una liga, sus
- * enfrentamientos se generan acá, en la misma transacción que la fase.
+ * enfrentamientos se generan acá, en la misma transacción que la fase. Con
+ * eliminación simple se genera el cuadro completo (todas las rondas); la
+ * eliminación doble (ida y vuelta) todavía no genera partidos.
  */
 export const iniciarTorneo = async (
   id: number,
@@ -291,6 +314,16 @@ export const iniciarTorneo = async (
   });
 
   const fase = FASE_INICIAL[torneo.formato];
+
+  if (fase.tipo === 'eliminacion' && !fase.idaYVuelta) {
+    return torneoRepository.iniciarTorneoConBracket(
+      id,
+      equipos.length,
+      fase,
+      generarPartidosDeEliminacion(equipos.map((equipo) => equipo.id))
+    );
+  }
+
   const enfrentamientos =
     fase.tipo === 'liga'
       ? generarEnfrentamientosDeLiga(
