@@ -3,7 +3,10 @@ import type { Torneo } from "../types/torneo.types";
 
 interface TablaTorneosProps {
   torneos: Torneo[];
-  onAccion: (torneo: Torneo, accion?: "ver" | "gestionar") => void;
+  onAccion: (
+    torneo: Torneo,
+    accion?: "ver" | "configurar" | "administrar",
+  ) => void;
 }
 
 export const TablaTorneos: React.FC<TablaTorneosProps> = ({
@@ -88,30 +91,52 @@ export const TablaTorneos: React.FC<TablaTorneosProps> = ({
                   {torneo.estado.replace("_", " ")}
                 </span>
               </td>
-              <td className="px-3 py-3 text-right text-xs font-medium space-x-1.5">
-                {torneo.estado === "borrador" ? (
-                  <>
+              <td className="px-3 py-3 text-right text-xs font-medium">
+                <div className="flex items-center justify-end gap-1.5">
+                  {torneo.estado === "borrador" && (
+                    <>
+                      <button
+                        onClick={() => onAccion(torneo, "ver")}
+                        className="text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded-md transition-colors"
+                      >
+                        Ver
+                      </button>
+                      <button
+                        onClick={() => onAccion(torneo, "configurar")}
+                        className="text-blue-600 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-md transition-colors font-semibold"
+                      >
+                        Configurar
+                      </button>
+                    </>
+                  )}
+
+                  {torneo.estado === "en_curso" && (
+                    <>
+                      <button
+                        onClick={() => onAccion(torneo, "ver")}
+                        className="text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded-md transition-colors"
+                      >
+                        Ver
+                      </button>
+                      <button
+                        onClick={() => onAccion(torneo, "administrar")}
+                        className="text-green-600 hover:text-green-900 bg-green-50 hover:bg-green-100 px-2.5 py-1 rounded-md transition-colors font-semibold"
+                      >
+                        Administrar
+                      </button>
+                    </>
+                  )}
+
+                  {(torneo.estado === "finalizado" ||
+                    torneo.estado === "cancelado") && (
                     <button
                       onClick={() => onAccion(torneo, "ver")}
-                      className="text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded-md transition-colors"
+                      className="text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 px-2.5 py-1 rounded-md transition-colors font-semibold"
                     >
                       Ver
                     </button>
-                    <button
-                      onClick={() => onAccion(torneo, "gestionar")}
-                      className="text-blue-600 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded-md transition-colors font-semibold"
-                    >
-                      Gestionar
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    onClick={() => onAccion(torneo, "ver")}
-                    className="text-blue-600 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-md transition-colors"
-                  >
-                    Ver
-                  </button>
-                )}
+                  )}
+                </div>
               </td>
             </tr>
           ))}
