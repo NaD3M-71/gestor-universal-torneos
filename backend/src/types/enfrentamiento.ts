@@ -98,3 +98,33 @@ export interface ResultadoEnfrentamiento {
   resultadoB: number | null;
   comentario: string | null;
 }
+
+/** Equipo de un enfrentamiento en el listado: lo justo para mostrarlo. */
+export interface EquipoDeEnfrentamiento {
+  id: number;
+  nombre: string;
+}
+
+/**
+ * Enfrentamiento tal como se devuelve en el listado de una fase. Los equipos
+ * vienen con su nombre, y son null en una ronda futura de eliminación o en un
+ * bye. Sin ganador ni marcador, el enfrentamiento sigue pendiente; un empate
+ * tiene marcador y ganadorId null.
+ */
+export interface EnfrentamientoDeLista {
+  id: number;
+  faseId: number;
+  instancia: string | null;
+  equipoA: EquipoDeEnfrentamiento | null;
+  equipoB: EquipoDeEnfrentamiento | null;
+  resultadoA: number | null;
+  resultadoB: number | null;
+  ganadorId: number | null;
+  comentario: string | null;
+}
+
+/** Respuesta de GET /api/torneos/:torneoId/enfrentamientos. */
+export interface ListadoEnfrentamientos {
+  faseId: number;
+  enfrentamientos: EnfrentamientoDeLista[];
+}

@@ -1,15 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as enfrentamientoRepository from '@repositories/enfrentamiento.repository';
+import * as posicionRepository from '@repositories/posicion.repository';
 import {
   cargarResultado,
+  listarEnfrentamientos,
   validarDatosResultado,
 } from '@services/enfrentamiento.service';
 import { obtenerTorneo } from '@services/torneo.service';
 import { AppError } from '../../src/middlewares/errors/AppError';
 import type { ErrorValidacion } from '../../src/middlewares/errors/ErrorValidacion';
+import type { FasePublica } from '../../src/types/fase';
 import type {
   DatosResultado,
   EnfrentamientoConFase,
+  EnfrentamientoDeLista,
 } from '../../src/types/enfrentamiento';
 import type { TorneoPublico } from '../../src/types/torneo';
 
@@ -22,6 +26,10 @@ vi.mock('@repositories/enfrentamiento.repository', () => ({
   guardarResultadoConPromocion: vi.fn(),
   buscarSiguienteDeSerie: vi.fn(),
   guardarResultadoConPromocionDeSerie: vi.fn(),
+  listarEnfrentamientosDeFase: vi.fn(),
+}));
+vi.mock('@repositories/posicion.repository', () => ({
+  listarFasesDeTorneo: vi.fn(),
 }));
 vi.mock('@services/torneo.service', () => ({
   obtenerTorneo: vi.fn(),
@@ -41,6 +49,10 @@ const buscarSiguienteDeSerieMock = vi.mocked(
 const guardarConPromocionDeSerieMock = vi.mocked(
   enfrentamientoRepository.guardarResultadoConPromocionDeSerie
 );
+const listarDeFaseMock = vi.mocked(
+  enfrentamientoRepository.listarEnfrentamientosDeFase
+);
+const fasesMock = vi.mocked(posicionRepository.listarFasesDeTorneo);
 const obtenerTorneoMock = vi.mocked(obtenerTorneo);
 
 const USUARIO_ID = 7;
@@ -892,5 +904,110 @@ describe('cargarResultado en una eliminatoria a ida y vuelta', () => {
         expect(guardarConPromocionDeSerieMock).not.toHaveBeenCalled();
       });
     });
+  });
+});
+
+describe('listarEnfrentamientos', () => {
+  const fase = (id: number, extra: Partial<FasePublica> = {}): FasePublica => ({
+    id,
+    torneoId: TORNEO_ID,
+    tipo: 'liga',
+    orden: 1,
+    estado: 'activa',
+    lineaDeCorte: null,
+    idaYVuelta: false,
+    comentarioDesempate: null,
+    ...extra,
+  });
+
+  const partidoDeLista = (id: number): EnfrentamientoDeLista => ({
+    id,
+    faseId: 3,
+    instancia: 'fecha_1',
+    equipoA: { id: EQUIPO_A, nombre: 'Alfa' },
+    equipoB: { id: EQUIPO_B, nombre: 'Beta' },
+    resultadoA: null,
+    resultadoB: null,
+    ganadorId: null,
+    comentario: null,
+  });
+
+  beforeEach(() => {
+    fasesMock.mockResolvedValue([fase(3)]);
+    listarDeFaseMock.mockResolvedValue([partidoDeLista(1), partidoDeLista(2)]);
+  });
+
+  it('lista los enfrentamientos de la fase activa', async () => {
+    const listado = await listarEnfrentamientos(TORNEO_ID, USUARIO_ID);
+
+    expect(listado.faseId).toBe(3);
+    expect(listado.enfrentamientos.map((e) => e.id)).toEqual([1, 2]);
+    expect(obtenerTorneoMock).toHaveBeenCalledWith(TORNEO_ID, USUARIO_ID);
+    expect(listarDeFaseMock).toHaveBeenCalledWith(3, undefined);
+  });
+
+  it('usa la fase pedida por faseId', async () => {
+    fasesMock.mockResolvedValue([fase(4, { orden: 2 }), fase(3)]);
+
+    const listado = await listarEnfrentamientos(TORNEO_ID, USUARIO_ID, 3);
+
+    expect(listado.faseId).toBe(3);
+    expect(listarDeFaseMock).toHaveBeenCalledWith(3, undefined);
+  });
+
+  it('sin faseId y sin fase activa usa la última fase', async () => {
+    fasesMock.mockResolvedValue([
+      fase(4, { orden: 2, estado: 'cerrada' }),
+      fase(3, { estado: 'cerrada' }),
+    ]);
+
+    const listado = await listarEnfrentamientos(TORNEO_ID, USUARIO_ID);
+
+    expect(listado.faseId).toBe(4);
+  });
+
+  it('filtra por instancia', async () => {
+    await listarEnfrentamientos(TORNEO_ID, USUARIO_ID, undefined, 'fecha_3');
+
+    expect(listarDeFaseMock).toHaveBeenCalledWith(3, 'fecha_3');
+  });
+
+  it('devuelve una lista vacía si la instancia no existe', async () => {
+    listarDeFaseMock.mockResolvedValue([]);
+
+    const listado = await listarEnfrentamientos(
+      TORNEO_ID,
+      USUARIO_ID,
+      undefined,
+      'fecha_99'
+    );
+
+    expect(listado.enfrentamientos).toEqual([]);
+  });
+
+  it('responde 404 si la fase no es del torneo', async () => {
+    await expect(
+      listarEnfrentamientos(TORNEO_ID, USUARIO_ID, 99)
+    ).rejects.toMatchObject({ statusCode: 404 });
+    expect(listarDeFaseMock).not.toHaveBeenCalled();
+  });
+
+  it('responde 409 si el torneo todavía no tiene fases', async () => {
+    fasesMock.mockResolvedValue([]);
+
+    await expect(
+      listarEnfrentamientos(TORNEO_ID, USUARIO_ID)
+    ).rejects.toMatchObject({ statusCode: 409 });
+  });
+
+  it('propaga el 404 si el torneo no es del organizador', async () => {
+    obtenerTorneoMock.mockRejectedValue(
+      new AppError('Torneo no encontrado.', 404)
+    );
+
+    await expect(
+      listarEnfrentamientos(TORNEO_ID, USUARIO_ID)
+    ).rejects.toMatchObject({ statusCode: 404 });
+    expect(fasesMock).not.toHaveBeenCalled();
   });
 });

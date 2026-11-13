@@ -3,6 +3,7 @@ import type {
   FormatoTorneo,
   SistemaPuntuacion,
 } from '@prisma/enums';
+import type { FasePublica } from './fase';
 
 /**
  * Datos públicos de un torneo tal como se devuelven a la API o al cliente.
@@ -23,6 +24,8 @@ export interface TorneoPublico {
     id: number;
     nombre: string;
   } | null;
+  /** Fases del torneo, de la primera a la última (no vienen en el listado). */
+  fases?: FasePublica[];
 }
 
 /**
@@ -38,6 +41,20 @@ export interface DatosNuevoTorneo {
   cantidadParticipantes: number;
   cantidadGrupos?: number | null;
   fechaInicio?: Date | null;
+  /**
+   * Línea de corte de la primera fase. No es una columna del torneo: se guarda
+   * en su fase 1. Solo aplica a liguilla_eliminacion (cuántos clasifican en
+   * total) y grupos_eliminatorias (cuántos clasifican por grupo).
+   */
+  lineaDeCorte?: number | null;
+  /**
+   * Si la fase de eliminación se juega a ida y vuelta. Tampoco es una columna
+   * del torneo: se guarda en su fase de eliminación. Solo se puede pedir en
+   * liguilla_eliminacion y grupos_eliminatorias; en los demás formatos la ida y
+   * vuelta la define el propio formato (liga_doble, eliminacion_doble).
+   * Si no se indica, es false.
+   */
+  idaYVuelta?: boolean;
 }
 
 /**
@@ -53,4 +70,6 @@ export interface DatosActualizarTorneo {
   cantidadParticipantes?: number;
   cantidadGrupos?: number | null;
   fechaInicio?: Date | null;
+  lineaDeCorte?: number | null;
+  idaYVuelta?: boolean;
 }

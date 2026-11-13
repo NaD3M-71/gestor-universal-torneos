@@ -1,5 +1,7 @@
 import { EstadoTorneo, SistemaPuntuacion } from '@prisma/enums';
 import * as enfrentamientoRepository from '@repositories/enfrentamiento.repository';
+import * as posicionRepository from '@repositories/posicion.repository';
+import { elegirFase } from '@services/posicion.service';
 import { obtenerTorneo } from '@services/torneo.service';
 import { AppError } from '../middlewares/errors/AppError';
 import {
@@ -10,6 +12,7 @@ import type {
   DatosResultado,
   EnfrentamientoConFase,
   EnfrentamientoPublico,
+  ListadoEnfrentamientos,
   PromocionAlSiguiente,
   PromocionDeSerie,
   ResultadoEnfrentamiento,
@@ -342,4 +345,29 @@ export const cargarResultado = async (
     enfrentamientoId,
     armarResultado(datos)
   );
+};
+
+/**
+ * Enfrentamientos de una fase de un torneo del organizador (404 si no es
+ * suyo), en el orden en que se generaron. Sin faseId usa la fase activa (o la
+ * última si ninguna está activa). Con instancia (ej: fecha_3) trae solo esa
+ * fecha o ronda; una instancia que no existe da una lista vacía.
+ */
+export const listarEnfrentamientos = async (
+  torneoId: number,
+  usuarioId: number,
+  faseId?: number,
+  instancia?: string
+): Promise<ListadoEnfrentamientos> => {
+  await obtenerTorneo(torneoId, usuarioId);
+  const fases = await posicionRepository.listarFasesDeTorneo(torneoId);
+  const fase = elegirFase(fases, faseId);
+
+  return {
+    faseId: fase.id,
+    enfrentamientos: await enfrentamientoRepository.listarEnfrentamientosDeFase(
+      fase.id,
+      instancia
+    ),
+  };
 };

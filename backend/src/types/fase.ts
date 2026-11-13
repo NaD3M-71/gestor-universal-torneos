@@ -18,13 +18,15 @@ export interface FasePublica {
 }
 
 /**
- * Datos para crear una fase. El torneo y el estado (activa) los completa el
- * repositorio.
+ * Datos para crear una fase. El torneo y el estado (pendiente: la fase pasa a
+ * activa cuando empieza a jugarse) los completa el repositorio. lineaDeCorte
+ * solo se informa en la primera fase de los formatos mixtos.
  */
 export interface DatosNuevaFase {
   tipo: TipoFase;
   orden: number;
   idaYVuelta: boolean;
+  lineaDeCorte?: number | null;
 }
 
 /**

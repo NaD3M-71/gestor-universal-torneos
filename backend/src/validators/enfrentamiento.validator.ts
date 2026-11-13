@@ -1,4 +1,4 @@
-import { body, param } from 'express-validator';
+import { body, param, query } from 'express-validator';
 
 /** Validación de los ids del torneo y del enfrentamiento en la URL. */
 export const validarEnfrentamientoDeLaRuta = [
@@ -41,4 +41,26 @@ export const validarResultado = [
     .trim()
     .isLength({ max: 255 })
     .withMessage('El comentario no puede superar los 255 caracteres.'),
+];
+
+/**
+ * Validación de GET /api/torneos/:torneoId/enfrentamientos: el id del torneo
+ * en la URL y, en la query, el faseId y la instancia, los dos opcionales.
+ */
+export const validarListado = [
+  param('torneoId')
+    .isInt({ min: 1 })
+    .withMessage('El id del torneo no es válido.'),
+  query('faseId')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('El id de la fase no es válido.'),
+  query('instancia')
+    .optional()
+    .isString()
+    .withMessage('La instancia debe ser un texto.')
+    .bail()
+    .trim()
+    .isLength({ min: 1, max: 50 })
+    .withMessage('La instancia debe tener entre 1 y 50 caracteres.'),
 ];
