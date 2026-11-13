@@ -16,6 +16,7 @@ export const CrearTorneoView: React.FC = () => {
     cantidadGrupos,
     participantesPorGrupo,
     lineaCorte,
+    idaYVuelta,
     resumen,
     errorGeneral,
   } = useCrearTorneo();
@@ -225,11 +226,11 @@ export const CrearTorneoView: React.FC = () => {
                       </span>
                     )}
                   </div>
-                  {errors.cantidadParticipantes && (
+                  {(errors.cantidadParticipantes ||
+                    resumen.totalParticipantes > 128) && (
                     <span className="text-xs text-red-500 mt-1 block col-span-3">
-                      ⚠️{" "}
-                      {errors.cantidadParticipantes.message ||
-                        "El total de participantes no puede superar los 128 equipos."}
+                      ⚠️ El torneo no puede superar el límite de 128
+                      participantes en total.
                     </span>
                   )}
                 </div>
@@ -315,6 +316,26 @@ export const CrearTorneoView: React.FC = () => {
                 )}
               </div>
             )}
+
+            {/* Checkbox de Ida y Vuelta para la fase eliminatoria */}
+            {(esGruposEliminatorias || esLiguilla) && (
+              <div className="mt-4 pt-3 border-t border-gray-200 flex items-center gap-2.5">
+                <input
+                  id="idaYVuelta"
+                  type="checkbox"
+                  {...register("idaYVuelta")}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <label
+                  htmlFor="idaYVuelta"
+                  className="text-sm text-gray-700 cursor-pointer select-none"
+                >
+                  Jugar los cruces de eliminación (Playoffs) a{" "}
+                  <strong>ida y vuelta</strong>
+                </label>
+              </div>
+            )}
+
             {/* PANEL DE RESUMEN Y ADVERTENCIAS */}
             {/* PANEL DE RESUMEN NARRATIVO */}
             <div className="bg-blue-50/70 border border-blue-200 p-4 rounded-xl text-sm text-blue-950 mt-4 space-y-2">
@@ -336,6 +357,9 @@ export const CrearTorneoView: React.FC = () => {
                     al cuadro de eliminación directa
                     {esPotenciaDeDos(resumen.totalClasificados) &&
                       ` arrancando directamente desde ${obtenerNombreRonda(resumen.totalClasificados)}`}
+                    {idaYVuelta
+                      ? " (cruces finales a ida y vuelta)"
+                      : " (partido único, sin vuelta)"}
                     .
                   </p>
                   {resumen.infoLlave && (
@@ -363,6 +387,9 @@ export const CrearTorneoView: React.FC = () => {
                     <strong>{resumen.totalClasificados} clasificados</strong>)
                     {esPotenciaDeDos(resumen.totalClasificados) &&
                       ` comenzando en ${obtenerNombreRonda(resumen.totalClasificados)}`}
+                    {idaYVuelta
+                      ? " (cruces finales a ida y vuelta)"
+                      : " (partido único, sin vuelta)"}
                     .
                   </p>
                   {resumen.tieneByesGrupos && (

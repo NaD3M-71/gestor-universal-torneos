@@ -32,9 +32,14 @@ export const useMisTorneos = () => {
   });
 
   // Lógica de redirección según el estado del torneo al hacer clic en "Ver / Editar"
-  const handleAccionTorneo = (torneo: Torneo) => {
+  const handleAccionTorneo = (torneo: Torneo, accion?: "ver" | "gestionar") => {
     if (torneo.estado === "borrador") {
-      navigate(`/torneos/${torneo.id}/editar`);
+      if (accion === "ver") {
+        setTorneoSeleccionado(torneo);
+        setModalAbierto(true);
+      } else {
+        navigate(`/torneos/${torneo.id}/editar`);
+      }
     } else if (torneo.estado === "en_curso") {
       navigate(`/torneos/${torneo.id}/gestion`);
     } else {

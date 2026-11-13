@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { crearTorneo } from "../service/torneoService";
 import { crearTorneoSchema, type CrearTorneoForm } from "../validators/torneo";
+import { type CrearTorneoDTO } from "../types/torneo.types";
 import {
   calcularLlaveAsimetrica,
   esPotenciaDeDos,
@@ -25,6 +26,7 @@ export const useCrearTorneo = () => {
       cantidadGrupos: null,
       participantesPorGrupo: 4,
       lineaCorte: 2,
+      idaYVuelta: false,
     },
   });
 
@@ -36,16 +38,30 @@ export const useCrearTorneo = () => {
   const participantesPorGrupo = watch("participantesPorGrupo") || 0;
   const lineaCorte = watch("lineaCorte") || 0;
   const cantidadParticipantes = watch("cantidadParticipantes") || 0;
+  const idaYVuelta = watch("idaYVuelta") || false;
 
   const esGruposEliminatorias = formato === "grupos_eliminatorias";
   const esLiguilla = formato === "liguilla_eliminacion";
   const esEliminacionPura =
     formato === "eliminacion_simple" || formato === "eliminacion_doble";
 
-  // Sincronizar sistema de puntuación según formato
+  // Limpiar y sincronizar parámetros al cambiar de formato
   useEffect(() => {
+    setValue("idaYVuelta", false);
+
     if (formato === "eliminacion_simple" || formato === "eliminacion_doble") {
       setValue("sistemaPuntuacion", "ganada_perdida");
+    }
+
+    if (formato === "grupos_eliminatorias") {
+      setValue("lineaCorte", 2);
+    } else if (formato === "liguilla_eliminacion") {
+      setValue(
+        "lineaCorte",
+        Math.min(4, Math.max(2, cantidadParticipantes - 1)),
+      );
+    } else {
+      setValue("lineaCorte", null);
     }
   }, [formato, setValue]);
 
@@ -120,17 +136,20 @@ export const useCrearTorneo = () => {
   const onSubmit = async (data: CrearTorneoForm) => {
     try {
       setErrorGeneral(null);
+      const esFormatoMixto = esGruposEliminatorias || esLiguilla;
 
-      const payload = {
-        ...data,
+      const payload: CrearTorneoDTO = {
+        nombre: data.nombre.trim(),
+        descripcion: data.descripcion?.trim() || null,
+        formato: data.formato,
+        sistemaPuntuacion: data.sistemaPuntuacion,
+        cantidadParticipantes: Number(data.cantidadParticipantes),
+        fechaInicio: data.fechaInicio || null,
+        lineaDeCorte: esFormatoMixto ? Number(data.lineaCorte) : null,
+        idaYVuelta: esFormatoMixto ? Boolean(data.idaYVuelta) : false,
         cantidadGrupos: esGruposEliminatorias
           ? Number(data.cantidadGrupos)
           : null,
-        cantidadParticipantes: Number(data.cantidadParticipantes),
-        lineaCorte:
-          esGruposEliminatorias || esLiguilla ? Number(data.lineaCorte) : null,
-        descripcion: data.descripcion?.trim() || null,
-        fechaInicio: data.fechaInicio || null,
       };
 
       const nuevoTorneo = await crearTorneo(payload);
@@ -156,6 +175,7 @@ export const useCrearTorneo = () => {
     cantidadGrupos,
     participantesPorGrupo,
     lineaCorte,
+    idaYVuelta,
     resumen,
     errorGeneral,
   };
