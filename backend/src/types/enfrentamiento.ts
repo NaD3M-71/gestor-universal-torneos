@@ -18,10 +18,14 @@ export interface EnfrentamientoPublico {
 /**
  * Enfrentamiento junto con su fase, para validar antes de cargar un resultado.
  * siguienteId es el partido al que pasa el ganador en una eliminatoria (null
- * en la final y en las fases de liga o grupos).
+ * en la final y en las fases de liga o grupos). En una eliminatoria a ida y
+ * vuelta, vueltaDeId es el id de la ida cuando este partido es una vuelta, y
+ * tieneVuelta indica que este partido es una ida (tiene una vuelta enlazada).
  */
 export interface EnfrentamientoConFase extends EnfrentamientoPublico {
   siguienteId: number | null;
+  vueltaDeId: number | null;
+  tieneVuelta: boolean;
   fase: {
     id: number;
     torneoId: number;
@@ -37,6 +41,30 @@ export interface SiguienteEnfrentamiento {
   ganadorId: number | null;
   /** Ids de los partidos que lo alimentan, de menor a mayor. */
   alimentadoresIds: number[];
+}
+
+/**
+ * Cruce siguiente de una eliminatoria a ida y vuelta, con lo necesario para
+ * promover a un equipo. jugado indica que alguno de sus dos partidos ya tiene
+ * resultado cargado.
+ */
+export interface SiguienteDeSerie {
+  idaId: number;
+  vueltaId: number;
+  /** Ids de los partidos que lo alimentan (vueltas o byes), de menor a mayor. */
+  alimentadoresIds: number[];
+  jugado: boolean;
+}
+
+/**
+ * Equipo que pasa al cruce siguiente a ida y vuelta: entra en el lado indicado
+ * de la ida y, invertido, en la vuelta.
+ */
+export interface PromocionDeSerie {
+  idaId: number;
+  vueltaId: number;
+  lado: 'A' | 'B';
+  equipoId: number;
 }
 
 /** Equipo que pasa al partido siguiente, y en qué lado (A o B) entra. */

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   asignarEquipos,
   calcularTamanoBracket,
+  expandirIdaYVuelta,
   generarBracket,
   sortearParticipantes,
   type PartidoBracket,
@@ -316,5 +317,113 @@ describe('asignarEquipos', () => {
     expect(() => asignarEquipos(generarBracket(4), [1, 2, 2, 3])).toThrow(
       'Hay equipos repetidos'
     );
+  });
+});
+
+describe('expandirIdaYVuelta', () => {
+  const serieDe = (cantidad: number) =>
+    expandirIdaYVuelta(
+      asignarEquipos(
+        generarBracket(cantidad),
+        Array.from({ length: cantidad }, (_, i) => i + 1)
+      )
+    );
+
+  it('con 4 equipos da dos filas por cruce: 3 cruces, 6 partidos', () => {
+    const partidos = serieDe(4);
+
+    expect(partidos).toHaveLength(6);
+    expect(partidos.map((p) => p.instancia)).toEqual([
+      'semifinal_ida',
+      'semifinal_vuelta',
+      'semifinal_ida',
+      'semifinal_vuelta',
+      'final_ida',
+      'final_vuelta',
+    ]);
+    partidos.forEach((p, i) => expect(p.indice).toBe(i));
+  });
+
+  it('la vuelta invierte los equipos de la ida y apunta a ella', () => {
+    const partidos = serieDe(4);
+    const ida = partidos[0];
+    const vuelta = partidos[1];
+
+    expect(vuelta?.equipoAId).toBe(ida?.equipoBId);
+    expect(vuelta?.equipoBId).toBe(ida?.equipoAId);
+    expect(vuelta?.vueltaDeIndice).toBe(ida?.indice);
+    expect(ida?.vueltaDeIndice).toBeNull();
+  });
+
+  it('la ida no tiene siguiente y la vuelta apunta a la ida del cruce siguiente', () => {
+    const partidos = serieDe(4);
+
+    expect(partidos[0]?.siguienteIndice).toBeNull();
+    expect(partidos[1]?.siguienteIndice).toBe(4);
+    expect(partidos[3]?.siguienteIndice).toBe(4);
+    expect(partidos[4]?.instancia).toBe('final_ida');
+    expect(partidos[5]?.siguienteIndice).toBeNull();
+  });
+
+  it('los partidos que se juegan no tienen ganador ni equipos en las rondas siguientes', () => {
+    const partidos = serieDe(4);
+
+    partidos.forEach((p) => expect(p.ganadorId).toBeNull());
+    partidos
+      .filter((p) => p.ronda === 2)
+      .forEach((p) => {
+        expect(p.equipoAId).toBeNull();
+        expect(p.equipoBId).toBeNull();
+      });
+  });
+
+  it('con 7 equipos el bye queda como una sola fila, sin sufijo y con ganador', () => {
+    const partidos = serieDe(7);
+    const bye = partidos.filter((p) => p.instancia === 'cuartos');
+
+    // 3 cruces x 2 filas + 1 bye + 2 semifinales x 2 + final x 2
+    expect(partidos).toHaveLength(13);
+    expect(bye).toHaveLength(1);
+    expect(bye[0]?.equipoBId).toBeNull();
+    expect(bye[0]?.ganadorId).toBe(bye[0]?.equipoAId);
+    expect(bye[0]?.vueltaDeIndice).toBeNull();
+  });
+
+  it('con 7 equipos el equipo del bye queda en la ida y, al revés, en la vuelta siguiente', () => {
+    const partidos = serieDe(7);
+    const bye = partidos.find((p) => p.instancia === 'cuartos');
+    const ida = partidos[bye?.siguienteIndice ?? -1];
+    const vuelta = partidos[(ida?.indice ?? -1) + 1];
+
+    expect(ida?.instancia).toBe('semifinal_ida');
+    expect([ida?.equipoAId, ida?.equipoBId]).toContain(bye?.ganadorId);
+    expect(vuelta?.instancia).toBe('semifinal_vuelta');
+    expect(vuelta?.equipoAId).toBe(ida?.equipoBId);
+    expect(vuelta?.equipoBId).toBe(ida?.equipoAId);
+  });
+
+  it('con 2 equipos hay una sola ronda: final_ida y final_vuelta', () => {
+    const partidos = serieDe(2);
+
+    expect(partidos.map((p) => p.instancia)).toEqual([
+      'final_ida',
+      'final_vuelta',
+    ]);
+    expect(partidos[1]?.vueltaDeIndice).toBe(0);
+    expect(partidos[1]?.siguienteIndice).toBeNull();
+  });
+
+  it('cada indice es único y los apuntadores caen dentro de la lista', () => {
+    const partidos = serieDe(7);
+
+    expect(new Set(partidos.map((p) => p.indice)).size).toBe(partidos.length);
+    partidos.forEach((p) => {
+      [p.siguienteIndice, p.vueltaDeIndice].forEach((destino) => {
+        if (destino !== null) {
+          expect(destino).toBeGreaterThanOrEqual(0);
+          expect(destino).toBeLessThan(partidos.length);
+        }
+      });
+    });
   });
 });

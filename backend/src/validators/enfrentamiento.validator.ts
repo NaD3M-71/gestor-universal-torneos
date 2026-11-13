@@ -13,7 +13,8 @@ export const validarEnfrentamientoDeLaRuta = [
 /**
  * Reglas de forma del cuerpo de PUT .../enfrentamientos/:id/resultado. Todos
  * los campos son opcionales por separado; que haya que elegir ganador o
- * empate, y que el marcador vaya completo, se controla en el servicio.
+ * empate (salvo en la ida de una serie, que lleva solo el marcador), y que el
+ * marcador vaya completo, se controla en el servicio.
  */
 export const validarResultado = [
   body('ganadorId')

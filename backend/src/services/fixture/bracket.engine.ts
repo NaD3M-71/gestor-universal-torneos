@@ -195,3 +195,84 @@ export function asignarEquipos(
 
   return asignados;
 }
+
+// Partido de un cuadro a ida y vuelta, listo para guardar. Cada cruce se
+// convierte en dos filas (ida y vuelta); el bye queda en una sola.
+export interface PartidoSerie {
+  // Posición dentro de la lista devuelta (id provisorio, como en PartidoBracket).
+  indice: number;
+  ronda: number;
+  instancia: string; // cuartos_ida, cuartos_vuelta; el bye queda sin sufijo
+  equipoAId: number | null;
+  equipoBId: number | null;
+  ganadorId: number | null;
+  // Solo la vuelta (o el bye) apunta al cruce siguiente, y lo hace a su ida:
+  // la ida no tiene siguiente.
+  siguienteIndice: number | null;
+  // Solo la vuelta apunta a su ida.
+  vueltaDeIndice: number | null;
+}
+
+// Convierte el cuadro de partido único en uno a ida y vuelta. Cada cruce con
+// dos equipos (o que van a tenerlos) da una ida y una vuelta con los lados
+// invertidos: el local de una es el visitante de la otra. Un bye sigue siendo
+// una sola fila sin vuelta. Los equipos que ya estaban promovidos en el cuadro
+// (por un bye) quedan en la ida y, invertidos, en la vuelta del cruce siguiente.
+export function expandirIdaYVuelta(
+  partidos: PartidoAsignado[]
+): PartidoSerie[] {
+  // Posición de la primera fila de cada cruce (su ida, o el bye). Se calcula
+  // antes de armar las filas porque la vuelta apunta a un cruce posterior.
+  const primeraFila = new Map<number, number>();
+  let siguienteLibre = 0;
+  partidos.forEach((partido) => {
+    primeraFila.set(partido.indice, siguienteLibre);
+    siguienteLibre += partido.esBye ? 1 : 2;
+  });
+
+  return partidos.flatMap((partido): PartidoSerie[] => {
+    const indice = primeraFila.get(partido.indice) ?? 0;
+    const siguienteIndice =
+      partido.siguienteIndice === null
+        ? null
+        : (primeraFila.get(partido.siguienteIndice) ?? null);
+
+    if (partido.esBye) {
+      return [
+        {
+          indice,
+          ronda: partido.ronda,
+          instancia: partido.instancia,
+          equipoAId: partido.equipoAId,
+          equipoBId: partido.equipoBId,
+          ganadorId: partido.ganadorId,
+          siguienteIndice,
+          vueltaDeIndice: null,
+        },
+      ];
+    }
+
+    return [
+      {
+        indice,
+        ronda: partido.ronda,
+        instancia: `${partido.instancia}_ida`,
+        equipoAId: partido.equipoAId,
+        equipoBId: partido.equipoBId,
+        ganadorId: null,
+        siguienteIndice: null,
+        vueltaDeIndice: null,
+      },
+      {
+        indice: indice + 1,
+        ronda: partido.ronda,
+        instancia: `${partido.instancia}_vuelta`,
+        equipoAId: partido.equipoBId,
+        equipoBId: partido.equipoAId,
+        ganadorId: null,
+        siguienteIndice,
+        vueltaDeIndice: indice,
+      },
+    ];
+  });
+}

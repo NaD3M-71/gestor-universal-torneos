@@ -6,7 +6,7 @@ import { ProtectedRoute } from "@components/ProtectedRoute";
 import {
   CrearTorneoView,
   MisTorneosView,
-  EditarTorneoView,
+  // EditarTorneoView,
 } from "@features/torneos";
 
 export default function App() {
@@ -27,7 +27,7 @@ export default function App() {
           <Route element={<ProtectedRoute />}>
             <Route path="/torneos" element={<MisTorneosView />} />
             <Route path="/torneos/nuevo" element={<CrearTorneoView />} />
-            <Route path="/torneos/:id/editar" element={<EditarTorneoView />} />
+            {/* <Route path="/torneos/:id/editar" element={<EditarTorneoView />} /> */}
           </Route>
         </Routes>
       </AuthProvider>
