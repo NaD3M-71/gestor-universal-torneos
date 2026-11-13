@@ -326,19 +326,18 @@ El proceso de creación es el mismo que el de la liga simple, pero se elige `for
      - Fila 202 (Vuelta): `equipo_a_id = 20`, `equipo_b_id = 10`, `instancia = 'semifinal_vuelta'`, `vuelta_de_id = 201`, `siguiente_id = 301` (Final).
 4. **Carga del partido de ida:**
    - Resultado: Equipo 10 (Local) 2 vs. Equipo 20 (Visitante) 1.
-   - Se actualiza la Fila 201: `resultado_a = 2`, `resultado_b = 1`, `ganador_id = 10`.
+   - Se actualiza la Fila 201: `resultado_a = 2`, `resultado_b = 1`, `ganador_id = NULL`. En la ida solo se carga el marcador (informativo): quien avanza se define al cargar la vuelta.
 5. **Carga del partido de vuelta y definición de serie:**
-   - Resultado en los 90 minutos: Equipo 20 (Local) 1 vs. Equipo 10 (Visitante) 0.
-   - Marcador global acumulado: 2 - 2 (empate).
-   - El organizador es avisado del empate y debe resolver quién es el ganador global de la serie, y tiene la posibilidad de dejar un comentario para explicar cómo se resolvió.
-   - El organizador ingresa en el formulario del Partido de Vuelta:
+   - Resultado: Equipo 20 (Local) 1 vs. Equipo 10 (Visitante) 0. El marcador es informativo: el sistema no calcula ningún global, porque el criterio de la serie depende del juego (goles, puntos, desempate, etc.).
+   - El organizador decide quién avanza e ingresa en el formulario del Partido de Vuelta:
      - `resultado_a = 1`
      - `resultado_b = 0`
-     - `ganador_id = 10` (el ganador del partido, no de la serie).
-     - `comentario = "Empate global 2-2. Clasifica Equipo 20 por diferencia de goles a favor."`
-   - El desempate no se puede resolver de manera automática, por lo que se realiza de modo manual. El sistema actualiza la Fila 202 con los resultados del enfrentamiento (ganador del partido: Equipo 10), y promueve al Equipo 20 (ganador de la serie) a la Final (ENFRENTAMIENTO ID 301).
+     - `ganador_id = 20` (quien avanza en la serie).
+     - `comentario = "Empate global 2-2. Clasifica Equipo 20 por diferencia de goles a favor."` (opcional).
+   - El sistema actualiza la Fila 202 y promueve al Equipo 20 a la Final (ENFRENTAMIENTO ID 301), tanto a su ida como a su vuelta.
 6. **Aclaraciones:**
    - El bye, si corresponde, es una única fila sin vuelta, igual que en eliminación simple.
+   - Una final a partido único se carga dejando la ida sin marcador y completando solo la vuelta.
 
 ### Caso de uso: formato mixto, Liguilla + Playoffs con resolución de empate
 

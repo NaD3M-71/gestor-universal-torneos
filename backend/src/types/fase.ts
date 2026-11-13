@@ -27,6 +27,35 @@ export interface DatosNuevaFase {
   idaYVuelta: boolean;
 }
 
+/**
+ * Datos para crear un enfrentamiento de una fase. La fase la completa el
+ * repositorio al crearlo junto con ella.
+ */
+export interface DatosNuevoEnfrentamiento {
+  equipoAId: number;
+  equipoBId: number;
+  instancia: string;
+}
+
+/**
+ * Partido de un cuadro de eliminación listo para guardar. Los equipos pueden
+ * ser null (partido de una ronda futura, o bye sin rival). siguienteIndice es
+ * la posición, dentro de la misma lista, del partido al que pasa el ganador.
+ * vueltaDeIndice solo se completa en la vuelta de un cruce a ida y vuelta: es
+ * la posición de su partido de ida (en el resto va null o no se envía).
+ * Es un subconjunto de PartidoAsignado del bracket engine.
+ */
+export interface DatosNuevoPartidoBracket {
+  indice: number;
+  ronda: number;
+  instancia: string;
+  equipoAId: number | null;
+  equipoBId: number | null;
+  ganadorId: number | null;
+  siguienteIndice: number | null;
+  vueltaDeIndice?: number | null | undefined;
+}
+
 /** Resultado de iniciar un torneo: el torneo ya en curso y su primera fase. */
 export interface TorneoIniciado {
   torneo: TorneoPublico;

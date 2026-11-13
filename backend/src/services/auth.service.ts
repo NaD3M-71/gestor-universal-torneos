@@ -3,9 +3,10 @@ import {
   buscarPorId,
   crearUsuario,
 } from '@repositories/usuario.repository';
-import { AppError } from '@middlewares/errors/AppError';
+import { AppError } from '../middlewares/errors/AppError';
 import type { UsuarioPublico } from '../types/usuario';
-import { hashearContrasenia, verificarContrasenia, generarToken } from './auth';
+import { hashearContrasenia, verificarContrasenia } from './auth/contrasenia';
+import { generarToken } from './auth/token';
 
 export interface DatosRegistro {
   nombre: string;

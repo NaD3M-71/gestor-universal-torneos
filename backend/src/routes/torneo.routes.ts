@@ -12,6 +12,9 @@ import { autenticar } from '../middlewares/autenticar';
 import { handleInputErrors } from '../middlewares/errors/handleInputErrors';
 import equipoRoutes from './equipo.routes';
 import grupoRoutes from './grupo.routes';
+import enfrentamientoRoutes from './enfrentamiento.routes';
+import posicionRoutes from './posicion.routes';
+import bracketRoutes from './bracket.routes';
 import {
   validarAltaTorneo,
   validarEdicionTorneo,
@@ -28,6 +31,15 @@ router.use('/:torneoId/equipos', equipoRoutes);
 
 // Asignación de equipos a grupos: /api/torneos/:torneoId/grupos
 router.use('/:torneoId/grupos', grupoRoutes);
+
+// Resultados de los enfrentamientos: /api/torneos/:torneoId/enfrentamientos
+router.use('/:torneoId/enfrentamientos', enfrentamientoRoutes);
+
+// Tabla de posiciones de una fase: /api/torneos/:torneoId/posiciones
+router.use('/:torneoId/posiciones', posicionRoutes);
+
+// Cuadro de una fase de eliminación: /api/torneos/:torneoId/bracket
+router.use('/:torneoId/bracket', bracketRoutes);
 
 router.post('/', validarAltaTorneo, handleInputErrors, crear);
 router.get('/', listar);
