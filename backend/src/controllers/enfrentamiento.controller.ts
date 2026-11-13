@@ -1,5 +1,8 @@
 import type { Request, Response } from 'express';
-import { cargarResultado } from '@services/enfrentamiento.service';
+import {
+  cargarResultado,
+  listarEnfrentamientos,
+} from '@services/enfrentamiento.service';
 import { AppError } from '../middlewares/errors/AppError';
 
 /** Id del organizador que carga el middleware autenticar (401 si falta). */
@@ -45,4 +48,24 @@ export const cargar = async (req: Request, res: Response): Promise<void> => {
   );
 
   res.status(200).json({ enfrentamiento });
+};
+
+/**
+ * GET /api/torneos/:torneoId/enfrentamientos?faseId=&instancia=
+ * Lista los enfrentamientos de una fase, con el nombre de sus equipos y su
+ * resultado, en el orden en que se generaron. Sin faseId usa la fase activa;
+ * con instancia (ej: fecha_3) trae solo esa fecha o ronda.
+ * Responde 200 con { faseId, enfrentamientos }.
+ */
+export const listar = async (req: Request, res: Response): Promise<void> => {
+  const { faseId, instancia } = req.query;
+
+  const listado = await listarEnfrentamientos(
+    torneoIdDe(req),
+    usuarioIdDe(req),
+    faseId === undefined ? undefined : Number(faseId),
+    typeof instancia === 'string' ? instancia : undefined
+  );
+
+  res.status(200).json(listado);
 };

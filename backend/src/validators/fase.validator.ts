@@ -12,3 +12,9 @@ export const validarCierreDeFase = [
     .isInt({ min: 1 })
     .withMessage('El id de la fase no es válido.'),
 ];
+
+/**
+ * Validación de GET /api/torneos/:torneoId/fases/:faseId/empates: los mismos
+ * ids en la URL que el cierre de fase.
+ */
+export const validarEmpatesDeFase = validarCierreDeFase;

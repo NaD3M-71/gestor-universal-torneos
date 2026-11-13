@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as posicionRepository from '@repositories/posicion.repository';
 import {
   calcularPosiciones,
+  detectarEmpatesRelevantes,
   elegirFase,
+  LINEA_DE_CORTE_POR_DEFECTO,
+  obtenerEmpates,
   obtenerPosiciones,
   PUNTOS_POR_SISTEMA,
 } from '@services/posicion.service';
@@ -359,6 +362,247 @@ describe('obtenerPosiciones', () => {
 
     await expect(
       obtenerPosiciones(TORNEO_ID, USUARIO_ID)
+    ).rejects.toMatchObject({ statusCode: 404 });
+    expect(fasesMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('detectarEmpatesRelevantes', () => {
+  const puntos = PUNTOS_POR_SISTEMA.futbol_clasico;
+
+  /** Tabla de los 4 equipos con los partidos dados (opcionalmente con otros equipos). */
+  const tablaDe = (
+    jugados: EnfrentamientoJugado[],
+    lista: EquipoParaTabla[] = equipos
+  ) => calcularPosiciones(lista, jugados, puntos);
+
+  // Alfa y Gama ganan (3 puntos cada uno); Beta y Delta pierden (0).
+  const dosGanadoresYDosPerdedores = [
+    partido(ALFA, BETA, 1, 0, ALFA),
+    partido(GAMA, DELTA, 1, 0, GAMA),
+  ];
+
+  it('no devuelve nada si no hay empates', () => {
+    const jugados = [
+      partido(ALFA, BETA, 1, 0, ALFA),
+      partido(ALFA, GAMA, 1, 0, ALFA),
+      partido(ALFA, DELTA, 1, 0, ALFA),
+      partido(BETA, GAMA, 1, 0, BETA),
+      partido(BETA, DELTA, 1, 0, BETA),
+      partido(GAMA, DELTA, 1, 0, GAMA),
+    ];
+
+    expect(detectarEmpatesRelevantes(tablaDe(jugados), jugados, 2)).toEqual([]);
+  });
+
+  it('detecta un empate dentro de la zona de clasificados', () => {
+    const jugados = dosGanadoresYDosPerdedores;
+
+    const empates = detectarEmpatesRelevantes(tablaDe(jugados), jugados, 2);
+
+    expect(empates).toHaveLength(1);
+    expect(empates[0]).toMatchObject({
+      grupo: null,
+      desdePosicion: 1,
+      hastaPosicion: 2,
+      puntos: 3,
+    });
+    expect(empates[0]?.equipos.map((f) => f.equipoId)).toEqual([ALFA, GAMA]);
+  });
+
+  it('detecta un empate que cruza la línea de corte', () => {
+    // Alfa gana todo (9 puntos); Beta, Gama y Delta quedan con 0, empatados del 2.° al 4.°.
+    const jugados = [
+      partido(ALFA, BETA, 1, 0, ALFA),
+      partido(ALFA, GAMA, 1, 0, ALFA),
+      partido(ALFA, DELTA, 1, 0, ALFA),
+    ];
+
+    const empates = detectarEmpatesRelevantes(tablaDe(jugados), jugados, 2);
+
+    expect(empates).toHaveLength(1);
+    expect(empates[0]).toMatchObject({ desdePosicion: 2, hastaPosicion: 4 });
+    expect(empates[0]?.equipos).toHaveLength(3);
+  });
+
+  it('ignora un empate que queda entero fuera de la línea de corte', () => {
+    const jugados = dosGanadoresYDosPerdedores;
+
+    // Con corte 1 solo importa el empate del 1.° puesto; Beta y Delta (3.° y 4.°) quedan afuera.
+    const empates = detectarEmpatesRelevantes(tablaDe(jugados), jugados, 1);
+
+    expect(empates).toHaveLength(1);
+    expect(empates[0]).toMatchObject({ desdePosicion: 1, hastaPosicion: 2 });
+  });
+
+  it('ignora un empate que arranca justo después del corte', () => {
+    const jugados = [
+      partido(ALFA, BETA, 1, 0, ALFA),
+      partido(ALFA, GAMA, 1, 0, ALFA),
+      partido(ALFA, DELTA, 1, 0, ALFA),
+    ];
+
+    expect(detectarEmpatesRelevantes(tablaDe(jugados), jugados, 1)).toEqual([]);
+  });
+
+  it('da por resuelto un empate cuando el organizador les dio ventajas distintas', () => {
+    const jugados = dosGanadoresYDosPerdedores;
+    const conVentaja = [
+      equipo(ALFA, 'Alfa', { ventajaDesempate: 1 }),
+      ...equipos.slice(1),
+    ];
+
+    const tabla = tablaDe(jugados, conVentaja);
+
+    expect(detectarEmpatesRelevantes(tabla, jugados, 2)).toEqual([]);
+  });
+
+  it('sigue marcando como empate a los que tienen la misma ventaja', () => {
+    const jugados = dosGanadoresYDosPerdedores;
+    const conVentaja = [
+      equipo(ALFA, 'Alfa', { ventajaDesempate: 1 }),
+      equipo(BETA, 'Beta'),
+      equipo(GAMA, 'Gama', { ventajaDesempate: 1 }),
+      equipo(DELTA, 'Delta'),
+    ];
+
+    const empates = detectarEmpatesRelevantes(
+      tablaDe(jugados, conVentaja),
+      jugados,
+      2
+    );
+
+    expect(empates).toHaveLength(1);
+    expect(empates[0]?.equipos.map((f) => f.equipoId)).toEqual([ALFA, GAMA]);
+  });
+
+  it('incluye el resultado entre los empatados y deja afuera el resto de los partidos', () => {
+    // Alfa y Gama empatan entre sí (1 punto cada uno) y ganan o pierden contra otros.
+    const entreSi = partido(ALFA, GAMA, 2, 2, null);
+    const jugados = [entreSi, partido(BETA, DELTA, 1, 0, BETA)];
+
+    const empates = detectarEmpatesRelevantes(tablaDe(jugados), jugados, 2);
+
+    // Beta tiene 3 puntos; Alfa y Gama quedan 1 punto cada uno, empatados 2.° y 3.°.
+    expect(empates).toHaveLength(1);
+    expect(empates[0]).toMatchObject({ desdePosicion: 2, hastaPosicion: 3 });
+    expect(empates[0]?.directos).toEqual([entreSi]);
+  });
+
+  it('trae a favor, en contra y diferencia de cada empatado para compararlos', () => {
+    const jugados = [
+      partido(ALFA, BETA, 3, 0, ALFA),
+      partido(GAMA, DELTA, 1, 0, GAMA),
+    ];
+
+    const [empate] = detectarEmpatesRelevantes(tablaDe(jugados), jugados, 2);
+    const alfa = empate?.equipos.find((f) => f.equipoId === ALFA);
+    const gama = empate?.equipos.find((f) => f.equipoId === GAMA);
+
+    expect(alfa).toMatchObject({ aFavor: 3, enContra: 0, diferencia: 3 });
+    expect(gama).toMatchObject({ aFavor: 1, enContra: 0, diferencia: 1 });
+  });
+
+  it('separa los empates por grupo, con los puestos de cada grupo', () => {
+    const conGrupos = [
+      equipo(ALFA, 'Alfa', { grupo: 1 }),
+      equipo(BETA, 'Beta', { grupo: 1 }),
+      equipo(GAMA, 'Gama', { grupo: 2 }),
+      equipo(DELTA, 'Delta', { grupo: 2 }),
+    ];
+    // Grupo 1: gana Alfa (sin empate). Grupo 2: empatan Gama y Delta.
+    const jugados = [
+      partido(ALFA, BETA, 1, 0, ALFA),
+      partido(GAMA, DELTA, 1, 1, null),
+    ];
+
+    const empates = detectarEmpatesRelevantes(
+      tablaDe(jugados, conGrupos),
+      jugados,
+      1
+    );
+
+    expect(empates).toHaveLength(1);
+    expect(empates[0]).toMatchObject({
+      grupo: 2,
+      desdePosicion: 1,
+      hastaPosicion: 2,
+    });
+  });
+
+  it('con la fase sin jugar todos están empatados', () => {
+    const empates = detectarEmpatesRelevantes(tablaDe([]), [], 1);
+
+    expect(empates).toHaveLength(1);
+    expect(empates[0]).toMatchObject({ desdePosicion: 1, hastaPosicion: 4 });
+  });
+});
+
+describe('obtenerEmpates', () => {
+  it('usa la línea de corte de la fase', async () => {
+    fasesMock.mockResolvedValue([fase(3, { lineaDeCorte: 2 })]);
+    jugadosMock.mockResolvedValue([
+      partido(ALFA, BETA, 1, 0, ALFA),
+      partido(GAMA, DELTA, 1, 0, GAMA),
+    ]);
+
+    const resultado = await obtenerEmpates(TORNEO_ID, USUARIO_ID, 3);
+
+    expect(resultado.faseId).toBe(3);
+    expect(resultado.lineaDeCorte).toBe(2);
+    expect(resultado.empates).toHaveLength(1);
+    expect(jugadosMock).toHaveBeenCalledWith(3);
+  });
+
+  it('sin línea de corte usa la de por defecto: solo importa el 1.° puesto', async () => {
+    jugadosMock.mockResolvedValue([
+      partido(ALFA, BETA, 1, 0, ALFA),
+      partido(GAMA, DELTA, 1, 0, GAMA),
+    ]);
+
+    const resultado = await obtenerEmpates(TORNEO_ID, USUARIO_ID, 3);
+
+    expect(resultado.lineaDeCorte).toBe(LINEA_DE_CORTE_POR_DEFECTO);
+    // Empate del 1.° (Alfa y Gama): relevante. El de Beta y Delta (3.° y 4.°): se ignora.
+    expect(resultado.empates).toHaveLength(1);
+    expect(resultado.empates[0]).toMatchObject({ desdePosicion: 1 });
+  });
+
+  it('devuelve la lista vacía si no hay empates relevantes', async () => {
+    jugadosMock.mockResolvedValue([
+      partido(ALFA, BETA, 1, 0, ALFA),
+      partido(ALFA, GAMA, 1, 0, ALFA),
+      partido(ALFA, DELTA, 1, 0, ALFA),
+    ]);
+
+    const resultado = await obtenerEmpates(TORNEO_ID, USUARIO_ID, 3);
+
+    expect(resultado.empates).toEqual([]);
+  });
+
+  it('responde 409 en una fase de eliminación y no busca partidos', async () => {
+    fasesMock.mockResolvedValue([fase(3, { tipo: 'eliminacion' })]);
+
+    await expect(
+      obtenerEmpates(TORNEO_ID, USUARIO_ID, 3)
+    ).rejects.toMatchObject({ statusCode: 409 });
+    expect(jugadosMock).not.toHaveBeenCalled();
+  });
+
+  it('responde 404 si la fase no es del torneo', async () => {
+    await expect(
+      obtenerEmpates(TORNEO_ID, USUARIO_ID, 99)
+    ).rejects.toMatchObject({ statusCode: 404 });
+    expect(jugadosMock).not.toHaveBeenCalled();
+  });
+
+  it('propaga el 404 si el torneo no es del organizador', async () => {
+    obtenerTorneoMock.mockRejectedValue(
+      new AppError('Torneo no encontrado.', 404)
+    );
+
+    await expect(
+      obtenerEmpates(TORNEO_ID, USUARIO_ID, 3)
     ).rejects.toMatchObject({ statusCode: 404 });
     expect(fasesMock).not.toHaveBeenCalled();
   });

@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as faseRepository from '@repositories/fase.repository';
 import { cerrarFase } from '@services/fase.service';
+import { calcularEmpatesDeFase } from '@services/posicion.service';
 import { obtenerTorneo } from '@services/torneo.service';
 import { AppError } from '../../src/middlewares/errors/AppError';
 import type { FasePublica } from '../../src/types/fase';
+import type { Empate } from '../../src/types/posicion';
 import type { TorneoPublico } from '../../src/types/torneo';
 
 // Se reemplazan el repositorio (sin base de datos) y la búsqueda de torneos,
@@ -17,8 +19,12 @@ vi.mock('@repositories/fase.repository', () => ({
 vi.mock('@services/torneo.service', () => ({
   obtenerTorneo: vi.fn(),
 }));
+vi.mock('@services/posicion.service', () => ({
+  calcularEmpatesDeFase: vi.fn(),
+}));
 
 const obtenerTorneoMock = vi.mocked(obtenerTorneo);
+const empatesMock = vi.mocked(calcularEmpatesDeFase);
 const buscarFaseMock = vi.mocked(faseRepository.buscarFasePorId);
 const pendientesLigaMock = vi.mocked(faseRepository.contarPendientesDeLiga);
 const pendientesEliminacionMock = vi.mocked(
@@ -57,6 +63,15 @@ const fase = (extra: Partial<FasePublica> = {}): FasePublica => ({
   ...extra,
 });
 
+const empate = (): Empate => ({
+  grupo: null,
+  desdePosicion: 1,
+  hastaPosicion: 2,
+  puntos: 3,
+  equipos: [],
+  directos: [],
+});
+
 /** Ejecuta cerrarFase y devuelve el error que lanza (falla si no lanza). */
 const errorAlCerrar = async (): Promise<AppError> => {
   try {
@@ -75,6 +90,11 @@ describe('cerrarFase', () => {
     pendientesLigaMock.mockResolvedValue(0);
     pendientesEliminacionMock.mockResolvedValue(0);
     cerrarFaseMock.mockResolvedValue(fase({ estado: 'cerrada' }));
+    empatesMock.mockResolvedValue({
+      faseId: FASE_ID,
+      lineaDeCorte: 1,
+      empates: [],
+    });
   });
 
   it('cierra una fase de liga con todos los partidos jugados', async () => {
@@ -181,5 +201,89 @@ describe('cerrarFase', () => {
     expect(error.statusCode).toBe(409);
     expect(error.message).toContain('Faltan 2 partidos');
     expect(cerrarFaseMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('cerrarFase con empates en puntos', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    obtenerTorneoMock.mockResolvedValue(torneo());
+    buscarFaseMock.mockResolvedValue(fase());
+    pendientesLigaMock.mockResolvedValue(0);
+    pendientesEliminacionMock.mockResolvedValue(0);
+    cerrarFaseMock.mockResolvedValue(fase({ estado: 'cerrada' }));
+    empatesMock.mockResolvedValue({
+      faseId: FASE_ID,
+      lineaDeCorte: 1,
+      empates: [],
+    });
+  });
+
+  it('consulta los empates de la fase con el sistema de puntuación del torneo', async () => {
+    await cerrarFase(TORNEO_ID, FASE_ID, USUARIO_ID);
+
+    expect(empatesMock).toHaveBeenCalledWith(
+      TORNEO_ID,
+      fase(),
+      'futbol_clasico'
+    );
+  });
+
+  it('responde 409 si hay un empate relevante sin resolver', async () => {
+    empatesMock.mockResolvedValue({
+      faseId: FASE_ID,
+      lineaDeCorte: 1,
+      empates: [empate()],
+    });
+
+    const error = await errorAlCerrar();
+
+    expect(error.statusCode).toBe(409);
+    expect(error.message).toContain('Hay 1 empate');
+    expect(cerrarFaseMock).not.toHaveBeenCalled();
+  });
+
+  it('usa el plural cuando hay más de un empate', async () => {
+    empatesMock.mockResolvedValue({
+      faseId: FASE_ID,
+      lineaDeCorte: 4,
+      empates: [empate(), empate()],
+    });
+
+    const error = await errorAlCerrar();
+
+    expect(error.message).toContain('Hay 2 empates');
+  });
+
+  it('también bloquea en una fase de grupos', async () => {
+    buscarFaseMock.mockResolvedValue(fase({ tipo: 'grupos' }));
+    empatesMock.mockResolvedValue({
+      faseId: FASE_ID,
+      lineaDeCorte: 2,
+      empates: [empate()],
+    });
+
+    const error = await errorAlCerrar();
+
+    expect(error.statusCode).toBe(409);
+    expect(cerrarFaseMock).not.toHaveBeenCalled();
+  });
+
+  it('no mira los empates si todavía faltan partidos (avisa de los partidos)', async () => {
+    pendientesLigaMock.mockResolvedValue(2);
+
+    const error = await errorAlCerrar();
+
+    expect(error.message).toContain('Faltan 2 partidos');
+    expect(empatesMock).not.toHaveBeenCalled();
+  });
+
+  it('no mira empates en una fase de eliminación', async () => {
+    buscarFaseMock.mockResolvedValue(fase({ tipo: 'eliminacion' }));
+
+    const resultado = await cerrarFase(TORNEO_ID, FASE_ID, USUARIO_ID);
+
+    expect(resultado.estado).toBe('cerrada');
+    expect(empatesMock).not.toHaveBeenCalled();
   });
 });

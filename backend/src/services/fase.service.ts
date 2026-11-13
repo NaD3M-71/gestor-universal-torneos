@@ -1,5 +1,6 @@
 import { EstadoTorneo } from '@prisma/enums';
 import * as faseRepository from '@repositories/fase.repository';
+import { calcularEmpatesDeFase } from '@services/posicion.service';
 import { obtenerTorneo } from '@services/torneo.service';
 import { AppError } from '../middlewares/errors/AppError';
 import type { FasePublica } from '../types/fase';
@@ -12,6 +13,12 @@ const mensajePendientes = (cantidad: number): string =>
   cantidad === 1
     ? 'Falta 1 partido por jugar: cargá su resultado antes de cerrar la fase.'
     : `Faltan ${cantidad} partidos por jugar: cargá sus resultados antes de cerrar la fase.`;
+
+/** Mensaje de empates sin resolver, con singular y plural. */
+const mensajeEmpates = (cantidad: number): string =>
+  cantidad === 1
+    ? 'Hay 1 empate en puntos que afecta la clasificación: resolvelo antes de cerrar la fase.'
+    : `Hay ${cantidad} empates en puntos que afectan la clasificación: resolvelos antes de cerrar la fase.`;
 
 /**
  * Cuenta los partidos de la fase que todavía no se jugaron. El criterio
@@ -29,12 +36,12 @@ const contarPendientes = (fase: FasePublica): Promise<number> =>
  * bloqueados (cargarResultado solo acepta fases activas). El torneo tiene que
  * ser del organizador (404 si no) y estar en curso, y la fase tiene que ser de
  * ese torneo (404) y estar activa (409). Con partidos sin jugar no se puede
- * cerrar (409).
+ * cerrar (409), ni con un empate en puntos relevante sin resolver (409): lo
+ * resuelve el organizador con la ventaja de desempate (6.3).
  *
  * Esta función solo cierra la fase. Lo que viene después se engancha acá en
- * las otras tarjetas: el chequeo de empates relevantes (6.2) antes de cerrar,
- * y la generación de la fase siguiente (6.4 y 6.5) o el cierre del torneo
- * (6.6) después.
+ * las otras tarjetas: la generación de la fase siguiente (6.4 y 6.5) o el
+ * cierre del torneo (6.6).
  */
 export const cerrarFase = async (
   torneoId: number,
@@ -62,6 +69,18 @@ export const cerrarFase = async (
   const pendientes = await contarPendientes(fase);
   if (pendientes > 0) {
     throw new AppError(mensajePendientes(pendientes), 409);
+  }
+
+  // Los empates en puntos solo existen en liga y grupos.
+  if (fase.tipo !== TIPO_FASE_ELIMINACION) {
+    const { empates } = await calcularEmpatesDeFase(
+      torneoId,
+      fase,
+      torneo.sistemaPuntuacion
+    );
+    if (empates.length > 0) {
+      throw new AppError(mensajeEmpates(empates.length), 409);
+    }
   }
 
   return faseRepository.cerrarFase(faseId);

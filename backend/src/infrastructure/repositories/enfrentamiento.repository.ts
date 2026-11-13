@@ -1,5 +1,6 @@
 import type {
   EnfrentamientoConFase,
+  EnfrentamientoDeLista,
   EnfrentamientoPublico,
   PromocionAlSiguiente,
   PromocionDeSerie,
@@ -200,3 +201,28 @@ export const guardarResultadoConPromocionDeSerie = async (
 
   return enfrentamiento;
 };
+
+/**
+ * Enfrentamientos de una fase con el nombre de sus equipos, en el orden en que
+ * se generaron (para una liga, fecha por fecha). Con instancia (ej: fecha_3)
+ * trae solo los de esa instancia.
+ */
+export const listarEnfrentamientosDeFase = (
+  faseId: number,
+  instancia?: string
+): Promise<EnfrentamientoDeLista[]> =>
+  prisma.enfrentamiento.findMany({
+    where: { faseId, ...(instancia === undefined ? {} : { instancia }) },
+    orderBy: { id: 'asc' },
+    select: {
+      id: true,
+      faseId: true,
+      instancia: true,
+      resultadoA: true,
+      resultadoB: true,
+      ganadorId: true,
+      comentario: true,
+      equipoA: { select: { id: true, nombre: true } },
+      equipoB: { select: { id: true, nombre: true } },
+    },
+  });

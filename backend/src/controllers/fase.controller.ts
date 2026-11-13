@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import { cerrarFase } from '@services/fase.service';
+import { obtenerEmpates } from '@services/posicion.service';
 import { AppError } from '../middlewares/errors/AppError';
 
 /** Id del organizador que carga el middleware autenticar (401 si falta). */
@@ -23,4 +24,21 @@ export const cerrar = async (req: Request, res: Response): Promise<void> => {
   );
 
   res.status(200).json({ fase });
+};
+
+/**
+ * GET /api/torneos/:torneoId/fases/:faseId/empates
+ * Empates en puntos relevantes de una fase de liga o grupos (los que impiden
+ * cerrarla), con lo necesario para compararlos: la fila de cada empatado y los
+ * partidos que jugaron entre sí. Responde 200 con { faseId, lineaDeCorte,
+ * empates }; empates vacío significa que la fase se puede cerrar por este lado.
+ */
+export const empates = async (req: Request, res: Response): Promise<void> => {
+  const resultado = await obtenerEmpates(
+    Number(req.params.torneoId),
+    usuarioIdDe(req),
+    Number(req.params.faseId)
+  );
+
+  res.status(200).json(resultado);
 };

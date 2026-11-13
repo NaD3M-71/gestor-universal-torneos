@@ -4,6 +4,8 @@ import { obtenerTorneo } from '@services/torneo.service';
 import { AppError } from '../middlewares/errors/AppError';
 import type { FasePublica } from '../types/fase';
 import type {
+  Empate,
+  EmpatesDeFase,
   EnfrentamientoJugado,
   EquipoParaTabla,
   FilaPosicion,
@@ -13,6 +15,9 @@ import type {
 
 const ESTADO_FASE_ACTIVA = 'activa';
 const TIPO_FASE_ELIMINACION = 'eliminacion';
+
+/** Línea de corte de una fase que no tiene: solo importa el 1.° puesto. */
+export const LINEA_DE_CORTE_POR_DEFECTO = 1;
 
 /** Puntos por victoria y empate de cada sistema (la derrota no suma). */
 export const PUNTOS_POR_SISTEMA: Record<SistemaPuntuacion, PuntosPorResultado> =
@@ -197,4 +202,112 @@ export const obtenerPosiciones = async (
     ),
     comentarioDesempate: fase.comentarioDesempate,
   };
+};
+
+/**
+ * Busca los empates relevantes de una tabla ya ordenada (la de
+ * calcularPosiciones). Un empate son equipos del mismo grupo con los mismos
+ * puntos y la misma ventajaDesempate; la ventaja es lo que el organizador usa
+ * para resolverlo. Es relevante si toca la zona de clasificados: alguno de los
+ * empatados ocupa un puesto dentro de la línea de corte, ya sea que el empate
+ * cruce el corte (define quién pasa) o quede adentro (define el cruce). Uno
+ * que queda entero afuera se ignora. La línea de corte es por grupo.
+ */
+export const detectarEmpatesRelevantes = (
+  filas: FilaPosicion[],
+  jugados: EnfrentamientoJugado[],
+  lineaDeCorte: number
+): Empate[] => {
+  // La tabla viene ordenada por grupo, puntos y ventaja: los empatados quedan
+  // juntos, así que alcanza con agrupar filas consecutivas iguales.
+  const bloques: FilaPosicion[][] = [];
+  filas.forEach((fila) => {
+    const bloque = bloques[bloques.length - 1];
+    const anterior = bloque?.[0];
+    if (
+      bloque !== undefined &&
+      anterior !== undefined &&
+      anterior.grupo === fila.grupo &&
+      anterior.puntos === fila.puntos &&
+      anterior.ventajaDesempate === fila.ventajaDesempate
+    ) {
+      bloque.push(fila);
+    } else {
+      bloques.push([fila]);
+    }
+  });
+
+  return bloques
+    .filter(
+      (bloque) =>
+        bloque.length > 1 && (bloque[0]?.posicion ?? 0) <= lineaDeCorte
+    )
+    .map((bloque) => {
+      const primera = bloque[0] as FilaPosicion;
+      const ultima = bloque[bloque.length - 1] as FilaPosicion;
+      const ids = new Set(bloque.map((fila) => fila.equipoId));
+
+      return {
+        grupo: primera.grupo,
+        desdePosicion: primera.posicion,
+        hastaPosicion: ultima.posicion,
+        puntos: primera.puntos,
+        equipos: bloque,
+        directos: jugados.filter(
+          (partido) => ids.has(partido.equipoAId) && ids.has(partido.equipoBId)
+        ),
+      };
+    });
+};
+
+/**
+ * Empates relevantes de una fase de liga o grupos, calculados en el momento.
+ * Sin línea de corte en la fase se usa LINEA_DE_CORTE_POR_DEFECTO (solo
+ * importa un empate en el 1.° puesto). Devuelve también la línea usada.
+ */
+export const calcularEmpatesDeFase = async (
+  torneoId: number,
+  fase: FasePublica,
+  sistemaPuntuacion: SistemaPuntuacion
+): Promise<EmpatesDeFase> => {
+  const [equipos, jugados] = await Promise.all([
+    posicionRepository.listarEquiposParaTabla(torneoId),
+    posicionRepository.listarEnfrentamientosJugados(fase.id),
+  ]);
+  const lineaDeCorte = fase.lineaDeCorte ?? LINEA_DE_CORTE_POR_DEFECTO;
+  const filas = calcularPosiciones(
+    equipos,
+    jugados,
+    PUNTOS_POR_SISTEMA[sistemaPuntuacion]
+  );
+
+  return {
+    faseId: fase.id,
+    lineaDeCorte,
+    empates: detectarEmpatesRelevantes(filas, jugados, lineaDeCorte),
+  };
+};
+
+/**
+ * Empates relevantes de una fase de liga o grupos de un torneo del
+ * organizador (404 si no es suyo; también si la fase no es del torneo). Las
+ * fases de eliminación no tienen empates en puntos (409).
+ */
+export const obtenerEmpates = async (
+  torneoId: number,
+  usuarioId: number,
+  faseId: number
+): Promise<EmpatesDeFase> => {
+  const torneo = await obtenerTorneo(torneoId, usuarioId);
+  const fases = await posicionRepository.listarFasesDeTorneo(torneoId);
+  const fase = elegirFase(fases, faseId);
+
+  if (fase.tipo === TIPO_FASE_ELIMINACION) {
+    throw new AppError(
+      'Las fases de eliminación no tienen empates en puntos.',
+      409
+    );
+  }
+
+  return calcularEmpatesDeFase(torneoId, fase, torneo.sistemaPuntuacion);
 };
