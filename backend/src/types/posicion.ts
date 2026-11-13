@@ -64,3 +64,31 @@ export interface EnfrentamientoJugado {
   resultadoB: number | null;
   ganadorId: number | null;
 }
+
+/**
+ * Empate en puntos entre equipos que ocupan puestos seguidos de la tabla (de
+ * un mismo grupo) y todavía no se resolvió: tienen los mismos puntos y la
+ * misma ventajaDesempate. Lo resuelve el organizador dándoles ventajas
+ * distintas. Trae lo necesario para comparar a los empatados: sus filas de la
+ * tabla (a favor, en contra, diferencia) y los partidos que jugaron entre sí.
+ */
+export interface Empate {
+  grupo: number | null;
+  /** Primer y último puesto que ocupan los empatados. */
+  desdePosicion: number;
+  hastaPosicion: number;
+  puntos: number;
+  equipos: FilaPosicion[];
+  /** Partidos jugados entre dos de los empatados (el resultado entre sí). */
+  directos: EnfrentamientoJugado[];
+}
+
+/**
+ * Respuesta de GET /api/torneos/:torneoId/fases/:faseId/empates. lineaDeCorte
+ * es la que se usó para decidir qué empates son relevantes.
+ */
+export interface EmpatesDeFase {
+  faseId: number;
+  lineaDeCorte: number;
+  empates: Empate[];
+}

@@ -13,7 +13,7 @@ import {
 } from '@services/torneo.service';
 import type { ErrorValidacion } from '../../src/middlewares/errors/ErrorValidacion';
 import type { EquipoPublico } from '../../src/types/equipo';
-import type { DatosNuevaFase } from '../../src/types/fase';
+import type { FasePublica } from '../../src/types/fase';
 import type { TorneoPublico } from '../../src/types/torneo';
 
 // Se reemplazan los repositorios para no necesitar una base de datos.
@@ -45,6 +45,50 @@ const listarEquiposMock = vi.mocked(equipoRepository.listarEquiposDeTorneo);
 
 const USUARIO_ID = 7;
 
+/** Fase de prueba: nace pendiente, como las que crea crearTorneo. */
+const fasePrueba = (
+  orden: number,
+  tipo: string,
+  extra: Partial<FasePublica> = {}
+): FasePublica => ({
+  id: 9 + orden,
+  torneoId: 1,
+  tipo,
+  orden,
+  estado: 'pendiente',
+  lineaDeCorte: null,
+  idaYVuelta: false,
+  comentarioDesempate: null,
+  ...extra,
+});
+
+/** Las fases que debe tener un torneo recién creado de cada formato. */
+const fasesDe = (
+  formato: TorneoPublico['formato'],
+  lineaDeCorte: number | null = null
+): FasePublica[] => {
+  switch (formato) {
+    case 'liga_simple':
+      return [fasePrueba(1, 'liga')];
+    case 'liga_doble':
+      return [fasePrueba(1, 'liga', { idaYVuelta: true })];
+    case 'eliminacion_simple':
+      return [fasePrueba(1, 'eliminacion')];
+    case 'eliminacion_doble':
+      return [fasePrueba(1, 'eliminacion', { idaYVuelta: true })];
+    case 'liguilla_eliminacion':
+      return [
+        fasePrueba(1, 'liga', { lineaDeCorte }),
+        fasePrueba(2, 'eliminacion'),
+      ];
+    case 'grupos_eliminatorias':
+      return [
+        fasePrueba(1, 'grupos', { lineaDeCorte }),
+        fasePrueba(2, 'eliminacion'),
+      ];
+  }
+};
+
 const torneoLiga: TorneoPublico = {
   id: 1,
   creadorId: USUARIO_ID,
@@ -57,18 +101,64 @@ const torneoLiga: TorneoPublico = {
   fechaInicio: null,
   estado: 'borrador',
   campeonId: null,
+  fases: fasesDe('liga_simple'),
 };
 
 const torneoGrupos: TorneoPublico = {
   ...torneoLiga,
   formato: 'grupos_eliminatorias',
   cantidadGrupos: 2,
+  fases: fasesDe('grupos_eliminatorias', 1),
 };
 
-/** Detalles del ErrorValidacion que lanza la función (vacío si no lanza). */
-const detallesDe = (config: ConfiguracionTorneo) => {
+const torneoLiguilla: TorneoPublico = {
+  ...torneoLiga,
+  formato: 'liguilla_eliminacion',
+  fases: fasesDe('liguilla_eliminacion', 4),
+};
+
+/** Un torneo en borrador del formato pedido, con las fases que le tocan. */
+const torneoDe = (
+  formato: TorneoPublico['formato'],
+  extra: Partial<TorneoPublico> = {}
+): TorneoPublico => ({
+  ...torneoLiga,
+  formato,
+  // Una línea de corte válida para cualquier cantidad de equipos de las pruebas.
+  fases: fasesDe(
+    formato,
+    formato === 'liguilla_eliminacion'
+      ? 2
+      : formato === 'grupos_eliminatorias'
+        ? 1
+        : null
+  ),
+  ...extra,
+});
+
+/**
+ * Detalles del ErrorValidacion que lanza la función (vacío si no lanza). Si no
+ * se indica la línea de corte, se usa una válida para los formatos que la
+ * piden y null para los demás.
+ */
+const detallesDe = (
+  config: Omit<ConfiguracionTorneo, 'lineaDeCorte'> & {
+    lineaDeCorte?: number | null;
+  }
+) => {
+  const porDefecto =
+    config.formato === 'liguilla_eliminacion'
+      ? 2
+      : config.formato === 'grupos_eliminatorias'
+        ? 1
+        : null;
+  const completa: ConfiguracionTorneo = {
+    ...config,
+    lineaDeCorte:
+      config.lineaDeCorte === undefined ? porDefecto : config.lineaDeCorte,
+  };
   try {
-    validarConfiguracion(config);
+    validarConfiguracion(completa);
   } catch (error) {
     return (error as ErrorValidacion).detalles;
   }
@@ -181,8 +271,169 @@ describe('validarConfiguracion', () => {
         formato: 'grupos_eliminatorias',
         cantidadParticipantes: 8,
         cantidadGrupos: null,
+        lineaDeCorte: 1,
       })
     ).toThrowError(expect.objectContaining({ statusCode: 400 }));
+  });
+
+  describe('línea de corte', () => {
+    it('exige la línea de corte en liguilla_eliminacion y en grupos_eliminatorias', () => {
+      const liguilla = detallesDe({
+        formato: 'liguilla_eliminacion',
+        cantidadParticipantes: 8,
+        cantidadGrupos: null,
+        lineaDeCorte: null,
+      });
+      const grupos = detallesDe({
+        formato: 'grupos_eliminatorias',
+        cantidadParticipantes: 8,
+        cantidadGrupos: 2,
+        lineaDeCorte: null,
+      });
+
+      expect(liguilla.map((d) => d.campo)).toEqual(['lineaDeCorte']);
+      expect(grupos.map((d) => d.campo)).toEqual(['lineaDeCorte']);
+    });
+
+    it.each([4, 8, 2])(
+      'acepta %s clasificados en una liguilla de 8 participantes',
+      (corte) => {
+        expect(
+          detallesDe({
+            formato: 'liguilla_eliminacion',
+            cantidadParticipantes: 8,
+            cantidadGrupos: null,
+            lineaDeCorte: corte,
+          })
+        ).toEqual([]);
+      }
+    );
+
+    it.each([1, 9])(
+      'rechaza %s clasificados en una liguilla de 8 participantes',
+      (corte) => {
+        const detalles = detallesDe({
+          formato: 'liguilla_eliminacion',
+          cantidadParticipantes: 8,
+          cantidadGrupos: null,
+          lineaDeCorte: corte,
+        });
+
+        expect(detalles).toHaveLength(1);
+        expect(detalles[0]?.campo).toBe('lineaDeCorte');
+      }
+    );
+
+    it('en una liguilla acepta una línea de corte que no es potencia de 2 (hay byes)', () => {
+      expect(
+        detallesDe({
+          formato: 'liguilla_eliminacion',
+          cantidadParticipantes: 8,
+          cantidadGrupos: null,
+          lineaDeCorte: 6,
+        })
+      ).toEqual([]);
+    });
+
+    it.each([1, 2])(
+      'acepta %s clasificados por grupo con 4 grupos y 8 participantes',
+      (corte) => {
+        expect(
+          detallesDe({
+            formato: 'grupos_eliminatorias',
+            cantidadParticipantes: 8,
+            cantidadGrupos: 4,
+            lineaDeCorte: corte,
+          })
+        ).toEqual([]);
+      }
+    );
+
+    it.each([3, 6])(
+      'rechaza %s clasificados por grupo porque no es potencia de 2',
+      (corte) => {
+        const detalles = detallesDe({
+          formato: 'grupos_eliminatorias',
+          cantidadParticipantes: 24,
+          cantidadGrupos: 2,
+          lineaDeCorte: corte,
+        });
+
+        expect(detalles).toHaveLength(1);
+        expect(detalles[0]?.campo).toBe('lineaDeCorte');
+      }
+    );
+
+    it('rechaza más clasificados por grupo que participantes por grupo', () => {
+      const detalles = detallesDe({
+        formato: 'grupos_eliminatorias',
+        cantidadParticipantes: 8,
+        cantidadGrupos: 4,
+        lineaDeCorte: 4,
+      });
+
+      expect(detalles).toHaveLength(1);
+      expect(detalles[0]?.campo).toBe('lineaDeCorte');
+    });
+
+    it.each(['liguilla_eliminacion', 'grupos_eliminatorias'] as const)(
+      'acepta la ida y vuelta de la eliminación en %s',
+      (formato) => {
+        expect(
+          detallesDe({
+            formato,
+            cantidadParticipantes: 8,
+            cantidadGrupos: formato === 'grupos_eliminatorias' ? 2 : null,
+            idaYVuelta: true,
+          })
+        ).toEqual([]);
+      }
+    );
+
+    it.each([
+      'liga_simple',
+      'liga_doble',
+      'eliminacion_simple',
+      'eliminacion_doble',
+    ] as const)('rechaza pedir la ida y vuelta en %s', (formato) => {
+      const detalles = detallesDe({
+        formato,
+        cantidadParticipantes: 8,
+        cantidadGrupos: null,
+        idaYVuelta: true,
+      });
+
+      expect(detalles).toHaveLength(1);
+      expect(detalles[0]?.campo).toBe('idaYVuelta');
+    });
+
+    it('acepta idaYVuelta en false en cualquier formato', () => {
+      expect(
+        detallesDe({
+          formato: 'liga_simple',
+          cantidadParticipantes: 8,
+          cantidadGrupos: null,
+          idaYVuelta: false,
+        })
+      ).toEqual([]);
+    });
+
+    it.each([
+      'liga_simple',
+      'liga_doble',
+      'eliminacion_simple',
+      'eliminacion_doble',
+    ] as const)('rechaza una línea de corte en %s', (formato) => {
+      const detalles = detallesDe({
+        formato,
+        cantidadParticipantes: 8,
+        cantidadGrupos: null,
+        lineaDeCorte: 4,
+      });
+
+      expect(detalles).toHaveLength(1);
+      expect(detalles[0]?.campo).toBe('lineaDeCorte');
+    });
   });
 });
 
@@ -219,6 +470,131 @@ describe('crearTorneo', () => {
   it('no guarda nada si la configuración no es válida', async () => {
     await expect(
       crearTorneo({ ...datos, formato: 'grupos_eliminatorias' })
+    ).rejects.toMatchObject({ statusCode: 400 });
+
+    expect(crearMock).not.toHaveBeenCalled();
+  });
+
+  it('no guarda nada si falta la línea de corte de un formato mixto', async () => {
+    await expect(
+      crearTorneo({ ...datos, formato: 'liguilla_eliminacion' })
+    ).rejects.toMatchObject({ statusCode: 400 });
+
+    expect(crearMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['liga_simple', [{ tipo: 'liga', orden: 1, idaYVuelta: false }]],
+    ['liga_doble', [{ tipo: 'liga', orden: 1, idaYVuelta: true }]],
+    [
+      'eliminacion_simple',
+      [{ tipo: 'eliminacion', orden: 1, idaYVuelta: false }],
+    ],
+    [
+      'eliminacion_doble',
+      [{ tipo: 'eliminacion', orden: 1, idaYVuelta: true }],
+    ],
+  ] as const)(
+    'con formato %s crea el torneo con sus fases',
+    async (formato, fases) => {
+      await crearTorneo({ ...datos, formato });
+
+      expect(crearMock.mock.calls[0]![1]).toEqual(fases);
+    }
+  );
+
+  it('con liguilla_eliminacion crea la liga (con la línea de corte) y la eliminatoria', async () => {
+    await crearTorneo({
+      ...datos,
+      formato: 'liguilla_eliminacion',
+      lineaDeCorte: 4,
+    });
+
+    expect(crearMock.mock.calls[0]![1]).toEqual([
+      { tipo: 'liga', orden: 1, idaYVuelta: false, lineaDeCorte: 4 },
+      { tipo: 'eliminacion', orden: 2, idaYVuelta: false },
+    ]);
+  });
+
+  it('con grupos_eliminatorias crea la fase de grupos (con la línea de corte) y la eliminatoria', async () => {
+    await crearTorneo({
+      ...datos,
+      formato: 'grupos_eliminatorias',
+      cantidadGrupos: 2,
+      lineaDeCorte: 2,
+    });
+
+    expect(crearMock.mock.calls[0]![1]).toEqual([
+      { tipo: 'grupos', orden: 1, idaYVuelta: false, lineaDeCorte: 2 },
+      { tipo: 'eliminacion', orden: 2, idaYVuelta: false },
+    ]);
+  });
+
+  it('no manda la línea de corte entre los datos del torneo: va dentro de la fase', async () => {
+    await crearTorneo({
+      ...datos,
+      formato: 'liguilla_eliminacion',
+      lineaDeCorte: 4,
+    });
+
+    expect(crearMock.mock.calls[0]![0]).not.toHaveProperty('lineaDeCorte');
+  });
+
+  it('con liguilla_eliminacion e idaYVuelta deja la ida y vuelta en la eliminatoria, no en la liga', async () => {
+    await crearTorneo({
+      ...datos,
+      formato: 'liguilla_eliminacion',
+      lineaDeCorte: 4,
+      idaYVuelta: true,
+    });
+
+    expect(crearMock.mock.calls[0]![1]).toEqual([
+      { tipo: 'liga', orden: 1, idaYVuelta: false, lineaDeCorte: 4 },
+      { tipo: 'eliminacion', orden: 2, idaYVuelta: true },
+    ]);
+  });
+
+  it('con grupos_eliminatorias e idaYVuelta deja la ida y vuelta en la eliminatoria', async () => {
+    await crearTorneo({
+      ...datos,
+      formato: 'grupos_eliminatorias',
+      cantidadGrupos: 2,
+      lineaDeCorte: 2,
+      idaYVuelta: true,
+    });
+
+    expect(crearMock.mock.calls[0]![1]).toEqual([
+      { tipo: 'grupos', orden: 1, idaYVuelta: false, lineaDeCorte: 2 },
+      { tipo: 'eliminacion', orden: 2, idaYVuelta: true },
+    ]);
+  });
+
+  it('idaYVuelta ausente equivale a false', async () => {
+    await crearTorneo({
+      ...datos,
+      formato: 'liguilla_eliminacion',
+      lineaDeCorte: 4,
+    });
+
+    expect(crearMock.mock.calls[0]![1]![1]).toMatchObject({
+      idaYVuelta: false,
+    });
+  });
+
+  it('no manda idaYVuelta entre los datos del torneo: va dentro de la fase', async () => {
+    await crearTorneo({
+      ...datos,
+      formato: 'liguilla_eliminacion',
+      lineaDeCorte: 4,
+      idaYVuelta: true,
+    });
+
+    expect(crearMock.mock.calls[0]![0]).not.toHaveProperty('idaYVuelta');
+  });
+
+  it('no guarda nada si se pide ida y vuelta en un formato que no la admite', async () => {
+    await expect(
+      crearTorneo({ ...datos, idaYVuelta: true })
     ).rejects.toMatchObject({ statusCode: 400 });
 
     expect(crearMock).not.toHaveBeenCalled();
@@ -287,10 +663,11 @@ describe('actualizarTorneo', () => {
 
     await actualizarTorneo(1, USUARIO_ID, { nombre: 'Nuevo nombre' });
 
-    expect(actualizarMock).toHaveBeenCalledWith(1, {
-      nombre: 'Nuevo nombre',
-      cantidadGrupos: null,
-    });
+    expect(actualizarMock).toHaveBeenCalledWith(
+      1,
+      { nombre: 'Nuevo nombre', cantidadGrupos: null },
+      undefined
+    );
   });
 
   it('limpia los grupos al pasar a un formato que no los usa', async () => {
@@ -298,10 +675,11 @@ describe('actualizarTorneo', () => {
 
     await actualizarTorneo(1, USUARIO_ID, { formato: 'liga_simple' });
 
-    expect(actualizarMock).toHaveBeenCalledWith(1, {
-      formato: 'liga_simple',
-      cantidadGrupos: null,
-    });
+    expect(actualizarMock).toHaveBeenCalledWith(
+      1,
+      { formato: 'liga_simple', cantidadGrupos: null },
+      [{ tipo: 'liga', orden: 1, idaYVuelta: false }]
+    );
   });
 
   it('conserva los grupos guardados si el formato sigue siendo grupos_eliminatorias', async () => {
@@ -309,9 +687,176 @@ describe('actualizarTorneo', () => {
 
     await actualizarTorneo(1, USUARIO_ID, { nombre: 'Copa' });
 
-    expect(actualizarMock).toHaveBeenCalledWith(1, {
-      nombre: 'Copa',
-      cantidadGrupos: 2,
+    expect(actualizarMock).toHaveBeenCalledWith(
+      1,
+      { nombre: 'Copa', cantidadGrupos: 2 },
+      undefined
+    );
+  });
+
+  describe('fases del borrador', () => {
+    it('no regenera las fases si no cambia el formato ni la línea de corte', async () => {
+      buscarMock.mockResolvedValue(torneoLiguilla);
+
+      await actualizarTorneo(1, USUARIO_ID, {
+        nombre: 'Otro nombre',
+        lineaDeCorte: 4,
+      });
+
+      expect(actualizarMock.mock.calls[0]![2]).toBeUndefined();
+    });
+
+    it('regenera las fases al cambiar el formato', async () => {
+      buscarMock.mockResolvedValue(torneoLiga);
+
+      await actualizarTorneo(1, USUARIO_ID, { formato: 'liga_doble' });
+
+      expect(actualizarMock.mock.calls[0]![2]).toEqual([
+        { tipo: 'liga', orden: 1, idaYVuelta: true },
+      ]);
+    });
+
+    it('regenera las fases al cambiar la línea de corte y la deja en la fase 1', async () => {
+      buscarMock.mockResolvedValue(torneoLiguilla);
+
+      await actualizarTorneo(1, USUARIO_ID, { lineaDeCorte: 6 });
+
+      expect(actualizarMock.mock.calls[0]![2]).toEqual([
+        { tipo: 'liga', orden: 1, idaYVuelta: false, lineaDeCorte: 6 },
+        { tipo: 'eliminacion', orden: 2, idaYVuelta: false },
+      ]);
+    });
+
+    it('no manda la línea de corte entre los datos del torneo', async () => {
+      buscarMock.mockResolvedValue(torneoLiguilla);
+
+      await actualizarTorneo(1, USUARIO_ID, { lineaDeCorte: 6 });
+
+      expect(actualizarMock.mock.calls[0]![1]).not.toHaveProperty(
+        'lineaDeCorte'
+      );
+    });
+
+    it('regenera las fases de un torneo en borrador que todavía no tiene ninguna', async () => {
+      buscarMock.mockResolvedValue({ ...torneoLiga, fases: [] });
+
+      await actualizarTorneo(1, USUARIO_ID, { nombre: 'Liga' });
+
+      expect(actualizarMock.mock.calls[0]![2]).toEqual([
+        { tipo: 'liga', orden: 1, idaYVuelta: false },
+      ]);
+    });
+
+    it('al cambiar a otro formato mixto no reutiliza la línea de corte guardada', async () => {
+      buscarMock.mockResolvedValue(torneoLiguilla);
+
+      await expect(
+        actualizarTorneo(1, USUARIO_ID, {
+          formato: 'grupos_eliminatorias',
+          cantidadGrupos: 2,
+        })
+      ).rejects.toMatchObject({ statusCode: 400 });
+      expect(actualizarMock).not.toHaveBeenCalled();
+    });
+
+    it('al pasar a un formato mixto exige indicar la línea de corte', async () => {
+      buscarMock.mockResolvedValue(torneoLiga);
+
+      await expect(
+        actualizarTorneo(1, USUARIO_ID, { formato: 'liguilla_eliminacion' })
+      ).rejects.toMatchObject({ statusCode: 400 });
+      expect(actualizarMock).not.toHaveBeenCalled();
+    });
+
+    it('valida la línea de corte guardada contra la nueva cantidad de participantes', async () => {
+      buscarMock.mockResolvedValue(torneoLiguilla);
+
+      await expect(
+        actualizarTorneo(1, USUARIO_ID, { cantidadParticipantes: 3 })
+      ).rejects.toMatchObject({ statusCode: 400 });
+      expect(actualizarMock).not.toHaveBeenCalled();
+    });
+
+    it('regenera las fases al activar la ida y vuelta de la eliminatoria', async () => {
+      buscarMock.mockResolvedValue(torneoLiguilla);
+
+      await actualizarTorneo(1, USUARIO_ID, { idaYVuelta: true });
+
+      expect(actualizarMock.mock.calls[0]![2]).toEqual([
+        { tipo: 'liga', orden: 1, idaYVuelta: false, lineaDeCorte: 4 },
+        { tipo: 'eliminacion', orden: 2, idaYVuelta: true },
+      ]);
+      expect(actualizarMock.mock.calls[0]![1]).not.toHaveProperty('idaYVuelta');
+    });
+
+    it('conserva la ida y vuelta guardada si no se indica', async () => {
+      buscarMock.mockResolvedValue({
+        ...torneoLiguilla,
+        fases: [
+          fasePrueba(1, 'liga', { lineaDeCorte: 4 }),
+          fasePrueba(2, 'eliminacion', { idaYVuelta: true }),
+        ],
+      });
+
+      await actualizarTorneo(1, USUARIO_ID, { nombre: 'Otro nombre' });
+
+      expect(actualizarMock.mock.calls[0]![2]).toBeUndefined();
+    });
+
+    it('regenera las fases al apagar la ida y vuelta', async () => {
+      buscarMock.mockResolvedValue({
+        ...torneoLiguilla,
+        fases: [
+          fasePrueba(1, 'liga', { lineaDeCorte: 4 }),
+          fasePrueba(2, 'eliminacion', { idaYVuelta: true }),
+        ],
+      });
+
+      await actualizarTorneo(1, USUARIO_ID, { idaYVuelta: false });
+
+      expect(actualizarMock.mock.calls[0]![2]).toEqual([
+        { tipo: 'liga', orden: 1, idaYVuelta: false, lineaDeCorte: 4 },
+        { tipo: 'eliminacion', orden: 2, idaYVuelta: false },
+      ]);
+    });
+
+    it('al cambiar de formato la ida y vuelta guardada no se arrastra', async () => {
+      buscarMock.mockResolvedValue({
+        ...torneoLiguilla,
+        fases: [
+          fasePrueba(1, 'liga', { lineaDeCorte: 4 }),
+          fasePrueba(2, 'eliminacion', { idaYVuelta: true }),
+        ],
+      });
+
+      await actualizarTorneo(1, USUARIO_ID, {
+        formato: 'grupos_eliminatorias',
+        cantidadGrupos: 2,
+        lineaDeCorte: 1,
+      });
+
+      expect(actualizarMock.mock.calls[0]![2]).toEqual([
+        { tipo: 'grupos', orden: 1, idaYVuelta: false, lineaDeCorte: 1 },
+        { tipo: 'eliminacion', orden: 2, idaYVuelta: false },
+      ]);
+    });
+
+    it('rechaza pedir la ida y vuelta en un formato que no la admite', async () => {
+      buscarMock.mockResolvedValue(torneoLiga);
+
+      await expect(
+        actualizarTorneo(1, USUARIO_ID, { idaYVuelta: true })
+      ).rejects.toMatchObject({ statusCode: 400 });
+      expect(actualizarMock).not.toHaveBeenCalled();
+    });
+
+    it('rechaza una línea de corte en un formato que no la usa', async () => {
+      buscarMock.mockResolvedValue(torneoLiga);
+
+      await expect(
+        actualizarTorneo(1, USUARIO_ID, { lineaDeCorte: 2 })
+      ).rejects.toMatchObject({ statusCode: 400 });
+      expect(actualizarMock).not.toHaveBeenCalled();
     });
   });
 
@@ -439,10 +984,11 @@ describe('iniciarTorneo', () => {
   beforeEach(() => {
     buscarMock.mockResolvedValue(torneoLiga);
     listarEquiposMock.mockResolvedValue(equiposDe(8));
+    // El repositorio activa la fase que le indican (ya existe, pendiente).
     const iniciada = (
       id: number,
       cantidadParticipantes: number,
-      fase: DatosNuevaFase
+      faseId: number
     ) => ({
       torneo: {
         ...torneoLiga,
@@ -450,52 +996,37 @@ describe('iniciarTorneo', () => {
         estado: 'en_curso' as const,
         cantidadParticipantes,
       },
-      fase: {
-        id: 10,
-        torneoId: id,
-        estado: 'activa',
-        lineaDeCorte: null,
-        comentarioDesempate: null,
-        ...fase,
-      },
+      fase: { ...fasePrueba(1, 'liga'), id: faseId, estado: 'activa' },
     });
-    iniciarMock.mockImplementation(async (id, cantidad, fase) =>
-      iniciada(id, cantidad, fase)
+    iniciarMock.mockImplementation(async (id, cantidad, faseId) =>
+      iniciada(id, cantidad, faseId)
     );
-    iniciarBracketMock.mockImplementation(async (id, cantidad, fase) =>
-      iniciada(id, cantidad, fase)
+    iniciarBracketMock.mockImplementation(async (id, cantidad, faseId) =>
+      iniciada(id, cantidad, faseId)
     );
   });
 
-  it('inicia un torneo en borrador y devuelve el torneo en curso con su primera fase', async () => {
+  it('inicia un torneo en borrador y devuelve el torneo en curso con su primera fase activa', async () => {
     const resultado = await iniciarTorneo(1, USUARIO_ID);
 
     expect(resultado.torneo.estado).toBe('en_curso');
-    expect(resultado.fase).toMatchObject({
-      torneoId: 1,
-      tipo: 'liga',
-      orden: 1,
-      estado: 'activa',
-      idaYVuelta: false,
-    });
+    expect(resultado.fase).toMatchObject({ id: 10, estado: 'activa' });
   });
 
   it.each([
-    ['liga_simple', 'liga', false],
-    ['liga_doble', 'liga', true],
-    ['eliminacion_simple', 'eliminacion', false],
-    ['eliminacion_doble', 'eliminacion', true],
-    ['liguilla_eliminacion', 'liga', false],
-    ['grupos_eliminatorias', 'grupos', false],
+    ['liga_simple', 'liga'],
+    ['liga_doble', 'liga'],
+    ['eliminacion_simple', 'eliminacion'],
+    ['eliminacion_doble', 'eliminacion'],
+    ['liguilla_eliminacion', 'liga'],
+    ['grupos_eliminatorias', 'grupos'],
   ] as const)(
-    'con formato %s crea una fase %s (idaYVuelta: %s)',
-    async (formato, tipo, idaYVuelta) => {
+    'con formato %s activa la primera fase, que es de tipo %s, sin crear otra',
+    async (formato, tipo) => {
       const usaGrupos = formato === 'grupos_eliminatorias';
-      buscarMock.mockResolvedValue({
-        ...torneoLiga,
-        formato,
-        cantidadGrupos: usaGrupos ? 2 : null,
-      });
+      buscarMock.mockResolvedValue(
+        torneoDe(formato, { cantidadGrupos: usaGrupos ? 2 : null })
+      );
       listarEquiposMock.mockResolvedValue(equiposDe(8, usaGrupos ? 1 : null));
 
       await iniciarTorneo(1, USUARIO_ID);
@@ -503,14 +1034,41 @@ describe('iniciarTorneo', () => {
       // La eliminación (simple o doble) guarda el cuadro con su propia función.
       const llamado = tipo === 'eliminacion' ? iniciarBracketMock : iniciarMock;
 
-      expect(llamado).toHaveBeenCalledWith(
-        1,
-        8,
-        { tipo, orden: 1, idaYVuelta },
-        expect.any(Array)
-      );
+      expect(llamado).toHaveBeenCalledWith(1, 8, 10, expect.any(Array));
     }
   );
+
+  it('en un formato con dos fases solo activa la primera: la segunda queda pendiente', async () => {
+    buscarMock.mockResolvedValue(torneoLiguilla);
+
+    await iniciarTorneo(1, USUARIO_ID);
+
+    expect(iniciarMock).toHaveBeenCalledTimes(1);
+    expect(iniciarMock.mock.calls[0]![2]).toBe(10);
+  });
+
+  it('responde 409 y no inicia nada si el torneo no tiene fases', async () => {
+    buscarMock.mockResolvedValue({ ...torneoLiga, fases: [] });
+
+    await expect(iniciarTorneo(1, USUARIO_ID)).rejects.toMatchObject({
+      statusCode: 409,
+    });
+    expect(iniciarMock).not.toHaveBeenCalled();
+    expect(iniciarBracketMock).not.toHaveBeenCalled();
+  });
+
+  it('responde 400 si la línea de corte guardada ya no entra con los equipos inscriptos', async () => {
+    buscarMock.mockResolvedValue({
+      ...torneoLiguilla,
+      fases: fasesDe('liguilla_eliminacion', 6),
+    });
+    listarEquiposMock.mockResolvedValue(equiposDe(4));
+
+    await expect(iniciarTorneo(1, USUARIO_ID)).rejects.toMatchObject({
+      statusCode: 400,
+    });
+    expect(iniciarMock).not.toHaveBeenCalled();
+  });
 
   it('fija la cantidad de participantes en la de equipos realmente inscriptos', async () => {
     listarEquiposMock.mockResolvedValue(equiposDe(5));
@@ -623,7 +1181,7 @@ describe('iniciarTorneo', () => {
       formato: TorneoPublico['formato'],
       cantidadEquipos: number
     ) => {
-      buscarMock.mockResolvedValue({ ...torneoLiga, formato });
+      buscarMock.mockResolvedValue(torneoDe(formato));
       listarEquiposMock.mockResolvedValue(equiposDe(cantidadEquipos));
 
       await iniciarTorneo(1, USUARIO_ID);
@@ -735,10 +1293,7 @@ describe('iniciarTorneo', () => {
     const partidosGenerados = () => iniciarBracketMock.mock.calls[0]?.[3] ?? [];
 
     const iniciarEliminacion = async (cantidadEquipos: number) => {
-      buscarMock.mockResolvedValue({
-        ...torneoLiga,
-        formato: 'eliminacion_simple',
-      });
+      buscarMock.mockResolvedValue(torneoDe('eliminacion_simple'));
       listarEquiposMock.mockResolvedValue(equiposDe(cantidadEquipos));
 
       await iniciarTorneo(1, USUARIO_ID);
@@ -806,10 +1361,7 @@ describe('iniciarTorneo', () => {
     const partidosGenerados = () => iniciarBracketMock.mock.calls[0]?.[3] ?? [];
 
     const iniciarEliminacionDoble = async (cantidadEquipos: number) => {
-      buscarMock.mockResolvedValue({
-        ...torneoLiga,
-        formato: 'eliminacion_doble',
-      });
+      buscarMock.mockResolvedValue(torneoDe('eliminacion_doble'));
       listarEquiposMock.mockResolvedValue(equiposDe(cantidadEquipos));
 
       await iniciarTorneo(1, USUARIO_ID);

@@ -5,6 +5,7 @@ const LARGO_MAXIMO_NOMBRE = 150;
 const MINIMO_PARTICIPANTES = 2;
 const MAXIMO_PARTICIPANTES = 128;
 const MINIMO_GRUPOS = 2;
+const MINIMO_LINEA_DE_CORTE = 1;
 
 const FORMATOS = Object.values(FormatoTorneo);
 const SISTEMAS_PUNTUACION = Object.values(SistemaPuntuacion);
@@ -51,7 +52,7 @@ const reglasTorneo = (obligatorio: boolean) => {
       .bail()
       .toInt(),
 
-    // Los tres siguientes admiten null (por ejemplo, para quitar los grupos
+    // Los siguientes admiten null (por ejemplo, para quitar los grupos
     // al cambiar de formato) y se tratan igual que si no vinieran.
     body('descripcion')
       .optional({ values: 'null' })
@@ -67,6 +68,22 @@ const reglasTorneo = (obligatorio: boolean) => {
       )
       .bail()
       .toInt(),
+    // La línea de corte se guarda en la fase 1 del torneo; sus reglas según el
+    // formato las resuelve el servicio.
+    body('lineaDeCorte')
+      .optional({ values: 'null' })
+      .isInt({ min: MINIMO_LINEA_DE_CORTE })
+      .withMessage(
+        `La línea de corte debe ser un entero de ${MINIMO_LINEA_DE_CORTE} o más.`
+      )
+      .bail()
+      .toInt(),
+    // La ida y vuelta de la fase de eliminación (formatos mixtos) se guarda en
+    // esa fase; qué formatos la admiten lo resuelve el servicio.
+    body('idaYVuelta')
+      .optional()
+      .isBoolean({ strict: true })
+      .withMessage('La ida y vuelta debe ser verdadero o falso.'),
     // Solo fecha, sin hora: toDate() la deja en UTC a medianoche, que es lo
     // que espera la columna DATE.
     body('fechaInicio')
