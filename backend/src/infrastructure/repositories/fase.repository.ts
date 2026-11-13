@@ -35,3 +35,28 @@ export const contarPendientesDeEliminacion = (
 /** Pasa una fase a cerrada: desde ahí sus resultados quedan bloqueados. */
 export const cerrarFase = (id: number): Promise<FasePublica> =>
   prisma.fase.update({ where: { id }, data: { estado: 'cerrada' } });
+
+/**
+ * Guarda el desempate de una fase en una sola transacción: la ventaja de cada
+ * equipo y, si viene, el comentario de la fase (null lo borra). Devuelve la
+ * fase actualizada.
+ */
+export const guardarDesempate = async (
+  faseId: number,
+  ventajas: { equipoId: number; ventajaDesempate: number }[],
+  comentario?: string | null
+): Promise<FasePublica> => {
+  const [fase] = await prisma.$transaction([
+    prisma.fase.update({
+      where: { id: faseId },
+      data: comentario === undefined ? {} : { comentarioDesempate: comentario },
+    }),
+    ...ventajas.map(({ equipoId, ventajaDesempate }) =>
+      prisma.equipo.update({
+        where: { id: equipoId },
+        data: { ventajaDesempate },
+      })
+    ),
+  ]);
+  return fase;
+};

@@ -1,9 +1,15 @@
 import { EstadoTorneo } from '@prisma/enums';
 import * as faseRepository from '@repositories/fase.repository';
-import { calcularEmpatesDeFase } from '@services/posicion.service';
+import {
+  LINEA_DE_CORTE_POR_DEFECTO,
+  calcularEmpatesDeFase,
+  calcularTablaDeFase,
+  detectarEmpatesRelevantes,
+} from '@services/posicion.service';
 import { obtenerTorneo } from '@services/torneo.service';
 import { AppError } from '../middlewares/errors/AppError';
 import type { FasePublica } from '../types/fase';
+import type { Empate, FilaPosicion } from '../types/posicion';
 
 const ESTADO_FASE_ACTIVA = 'activa';
 const TIPO_FASE_ELIMINACION = 'eliminacion';
@@ -84,4 +90,126 @@ export const cerrarFase = async (
   }
 
   return faseRepository.cerrarFase(faseId);
+};
+
+/**
+ * Calcula las ventajas de desempate nuevas para resolver un empate. `grupo` son
+ * las filas de la tabla con el mismo grupo y los mismos puntos que los
+ * empatados; `orden` son los ids de los empatados, del mejor al peor. Se
+ * reordenan los niveles de ventaja del grupo: el nivel del empate se abre en un
+ * nivel por equipo, según `orden`, y los demás niveles conservan su lugar. Las
+ * ventajas quedan de 0 (el peor) hacia arriba y el mejor tiene la mayor.
+ * Devuelve solo los equipos cuya ventaja cambia.
+ */
+export const calcularVentajasDeDesempate = (
+  grupo: FilaPosicion[],
+  orden: number[]
+): { equipoId: number; ventajaDesempate: number }[] => {
+  const ordenados = new Set(orden);
+  const ventajaEmpate = grupo.find((fila) =>
+    ordenados.has(fila.equipoId)
+  )?.ventajaDesempate;
+  const valores = [...new Set(grupo.map((f) => f.ventajaDesempate))].sort(
+    (a, b) => b - a
+  );
+
+  // Cada nivel es la lista de equipos que comparten ventaja, del mejor al peor.
+  const niveles: number[][] = valores.flatMap((valor) =>
+    valor === ventajaEmpate
+      ? orden.map((id) => [id])
+      : [
+          grupo
+            .filter((fila) => fila.ventajaDesempate === valor)
+            .map((fila) => fila.equipoId),
+        ]
+  );
+
+  const actual = new Map(grupo.map((f) => [f.equipoId, f.ventajaDesempate]));
+  return niveles
+    .flatMap((ids, indice) =>
+      ids.map((equipoId) => ({
+        equipoId,
+        ventajaDesempate: niveles.length - 1 - indice,
+      }))
+    )
+    .filter((v) => actual.get(v.equipoId) !== v.ventajaDesempate);
+};
+
+/**
+ * Resuelve un empate en puntos con el criterio del organizador (6.3). `orden`
+ * son los ids de los equipos empatados, del que merece el mejor puesto al peor:
+ * tienen que ser exactamente los de un empate pendiente de la fase. El sistema
+ * les asigna ventajas de desempate decrecientes y, si viene `comentario`,
+ * reemplaza el de la fase. Solo en fases de liga o grupos activas, con todos
+ * los partidos jugados, de un torneo en curso. Devuelve la fase y los empates
+ * que quedan (vacío: ya se puede cerrar por este lado).
+ */
+export const resolverDesempate = async (
+  torneoId: number,
+  faseId: number,
+  usuarioId: number,
+  orden: number[],
+  comentario?: string | null
+): Promise<{ fase: FasePublica; empates: Empate[] }> => {
+  const torneo = await obtenerTorneo(torneoId, usuarioId);
+  const fase = await faseRepository.buscarFasePorId(faseId);
+
+  if (fase === null || fase.torneoId !== torneoId) {
+    throw new AppError('Fase no encontrada.', 404);
+  }
+  if (torneo.estado !== EstadoTorneo.en_curso) {
+    throw new AppError(
+      'Solo se puede resolver un desempate en un torneo en curso.',
+      409
+    );
+  }
+  if (fase.estado !== ESTADO_FASE_ACTIVA) {
+    throw new AppError('La fase ya está cerrada.', 409);
+  }
+  if (fase.tipo === TIPO_FASE_ELIMINACION) {
+    throw new AppError(
+      'Las fases de eliminación no tienen empates en puntos.',
+      409
+    );
+  }
+
+  const pendientes = await contarPendientes(fase);
+  if (pendientes > 0) {
+    throw new AppError(mensajePendientes(pendientes), 409);
+  }
+
+  const { filas, jugados } = await calcularTablaDeFase(
+    torneoId,
+    fase,
+    torneo.sistemaPuntuacion
+  );
+  const corte = fase.lineaDeCorte ?? LINEA_DE_CORTE_POR_DEFECTO;
+  const ids = new Set(orden);
+  const empate = detectarEmpatesRelevantes(filas, jugados, corte).find(
+    (e) =>
+      e.equipos.length === ids.size &&
+      e.equipos.every((f) => ids.has(f.equipoId))
+  );
+  if (empate === undefined) {
+    throw new AppError(
+      'Los equipos indicados no coinciden con un empate pendiente de la fase.',
+      409
+    );
+  }
+
+  const grupo = filas.filter(
+    (f) => f.grupo === empate.grupo && f.puntos === empate.puntos
+  );
+  const faseNueva = await faseRepository.guardarDesempate(
+    faseId,
+    calcularVentajasDeDesempate(grupo, orden),
+    comentario
+  );
+
+  const { empates } = await calcularEmpatesDeFase(
+    torneoId,
+    faseNueva,
+    torneo.sistemaPuntuacion
+  );
+  return { fase: faseNueva, empates };
 };

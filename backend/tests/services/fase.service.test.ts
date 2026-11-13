@@ -1,11 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as faseRepository from '@repositories/fase.repository';
-import { cerrarFase } from '@services/fase.service';
-import { calcularEmpatesDeFase } from '@services/posicion.service';
+import {
+  calcularVentajasDeDesempate,
+  cerrarFase,
+  resolverDesempate,
+} from '@services/fase.service';
+import {
+  calcularEmpatesDeFase,
+  calcularTablaDeFase,
+} from '@services/posicion.service';
 import { obtenerTorneo } from '@services/torneo.service';
 import { AppError } from '../../src/middlewares/errors/AppError';
 import type { FasePublica } from '../../src/types/fase';
-import type { Empate } from '../../src/types/posicion';
+import type { Empate, FilaPosicion } from '../../src/types/posicion';
 import type { TorneoPublico } from '../../src/types/torneo';
 
 // Se reemplazan el repositorio (sin base de datos) y la búsqueda de torneos,
@@ -15,12 +22,15 @@ vi.mock('@repositories/fase.repository', () => ({
   contarPendientesDeLiga: vi.fn(),
   contarPendientesDeEliminacion: vi.fn(),
   cerrarFase: vi.fn(),
+  guardarDesempate: vi.fn(),
 }));
 vi.mock('@services/torneo.service', () => ({
   obtenerTorneo: vi.fn(),
 }));
-vi.mock('@services/posicion.service', () => ({
+vi.mock('@services/posicion.service', async (importarOriginal) => ({
+  ...(await importarOriginal<typeof import('@services/posicion.service')>()),
   calcularEmpatesDeFase: vi.fn(),
+  calcularTablaDeFase: vi.fn(),
 }));
 
 const obtenerTorneoMock = vi.mocked(obtenerTorneo);
@@ -31,6 +41,8 @@ const pendientesEliminacionMock = vi.mocked(
   faseRepository.contarPendientesDeEliminacion
 );
 const cerrarFaseMock = vi.mocked(faseRepository.cerrarFase);
+const tablaMock = vi.mocked(calcularTablaDeFase);
+const guardarMock = vi.mocked(faseRepository.guardarDesempate);
 
 const USUARIO_ID = 7;
 const TORNEO_ID = 1;
@@ -285,5 +297,165 @@ describe('cerrarFase con empates en puntos', () => {
 
     expect(resultado.estado).toBe('cerrada');
     expect(empatesMock).not.toHaveBeenCalled();
+  });
+});
+
+const fila = (
+  equipoId: number,
+  posicion: number,
+  puntos: number,
+  ventajaDesempate = 0
+): FilaPosicion => ({
+  posicion,
+  equipoId,
+  nombre: `Equipo ${equipoId}`,
+  grupo: null,
+  pj: 3,
+  pg: 0,
+  pe: 0,
+  pp: 0,
+  puntos,
+  aFavor: 0,
+  enContra: 0,
+  diferencia: 0,
+  ventajaDesempate,
+});
+
+describe('calcularVentajasDeDesempate', () => {
+  it('da la mayor ventaja al primero y 0 al último', () => {
+    const grupo = [fila(1, 1, 6), fila(2, 1, 6), fila(3, 1, 6)];
+
+    expect(calcularVentajasDeDesempate(grupo, [2, 3, 1])).toEqual([
+      { equipoId: 2, ventajaDesempate: 2 },
+      { equipoId: 3, ventajaDesempate: 1 },
+    ]);
+  });
+
+  it('conserva el lugar de los equipos con otra ventaja en el grupo', () => {
+    // 4 ya estaba por encima (ventaja 1); 5 por debajo (ventaja -1).
+    const grupo = [
+      fila(4, 1, 6, 1),
+      fila(1, 2, 6),
+      fila(2, 2, 6),
+      fila(5, 4, 6, -1),
+    ];
+
+    const resultado = calcularVentajasDeDesempate(grupo, [2, 1]);
+    const ventajas = new Map(
+      grupo.map((f) => [f.equipoId, f.ventajaDesempate])
+    );
+    resultado.forEach((v) => ventajas.set(v.equipoId, v.ventajaDesempate));
+
+    expect(ventajas.get(4)).toBeGreaterThan(ventajas.get(2) as number);
+    expect(ventajas.get(2)).toBeGreaterThan(ventajas.get(1) as number);
+    expect(ventajas.get(1)).toBeGreaterThan(ventajas.get(5) as number);
+  });
+
+  it('no toca a los equipos cuya ventaja no cambia', () => {
+    const grupo = [fila(1, 1, 6), fila(2, 1, 6)];
+
+    expect(calcularVentajasDeDesempate(grupo, [1, 2])).toEqual([
+      { equipoId: 1, ventajaDesempate: 1 },
+    ]);
+  });
+});
+
+describe('resolverDesempate', () => {
+  const resolver = (orden: number[], comentario?: string | null) =>
+    resolverDesempate(TORNEO_ID, FASE_ID, USUARIO_ID, orden, comentario);
+
+  const errorAlResolver = async (orden: number[]): Promise<AppError> => {
+    try {
+      await resolver(orden);
+    } catch (error) {
+      return error as AppError;
+    }
+    throw new Error('Se esperaba que resolverDesempate lanzara un error.');
+  };
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    obtenerTorneoMock.mockResolvedValue(torneo());
+    buscarFaseMock.mockResolvedValue(fase());
+    pendientesLigaMock.mockResolvedValue(0);
+    tablaMock.mockResolvedValue({
+      filas: [fila(1, 1, 6), fila(2, 1, 6), fila(3, 3, 3), fila(4, 4, 0)],
+      jugados: [],
+    });
+    guardarMock.mockResolvedValue(fase({ comentarioDesempate: 'Por goles' }));
+    empatesMock.mockResolvedValue({
+      faseId: FASE_ID,
+      lineaDeCorte: 1,
+      empates: [],
+    });
+  });
+
+  it('guarda las ventajas según el orden y devuelve los empates restantes', async () => {
+    const resultado = await resolver([2, 1], 'Por goles');
+
+    expect(guardarMock).toHaveBeenCalledWith(
+      FASE_ID,
+      [{ equipoId: 2, ventajaDesempate: 1 }],
+      'Por goles'
+    );
+    expect(resultado.fase.comentarioDesempate).toBe('Por goles');
+    expect(resultado.empates).toEqual([]);
+  });
+
+  it('no pasa comentario si no viene (queda el anterior)', async () => {
+    await resolver([1, 2]);
+
+    expect(guardarMock.mock.calls[0]?.[2]).toBeUndefined();
+  });
+
+  it('responde 409 si los equipos no son un empate pendiente', async () => {
+    const error = await errorAlResolver([3, 4]);
+
+    expect(error.statusCode).toBe(409);
+    expect(guardarMock).not.toHaveBeenCalled();
+  });
+
+  it('responde 409 si el orden incluye solo una parte del empate', async () => {
+    tablaMock.mockResolvedValue({
+      filas: [fila(1, 1, 6), fila(2, 1, 6), fila(3, 1, 6)],
+      jugados: [],
+    });
+
+    const error = await errorAlResolver([1, 2]);
+
+    expect(error.statusCode).toBe(409);
+  });
+
+  it('responde 409 si faltan partidos por jugar', async () => {
+    pendientesLigaMock.mockResolvedValue(2);
+
+    const error = await errorAlResolver([1, 2]);
+
+    expect(error.statusCode).toBe(409);
+    expect(guardarMock).not.toHaveBeenCalled();
+  });
+
+  it('responde 409 si la fase ya está cerrada', async () => {
+    buscarFaseMock.mockResolvedValue(fase({ estado: 'cerrada' }));
+
+    expect((await errorAlResolver([1, 2])).statusCode).toBe(409);
+  });
+
+  it('responde 409 en una fase de eliminación', async () => {
+    buscarFaseMock.mockResolvedValue(fase({ tipo: 'eliminacion' }));
+
+    expect((await errorAlResolver([1, 2])).statusCode).toBe(409);
+  });
+
+  it('responde 409 si el torneo no está en curso', async () => {
+    obtenerTorneoMock.mockResolvedValue(torneo({ estado: 'borrador' }));
+
+    expect((await errorAlResolver([1, 2])).statusCode).toBe(409);
+  });
+
+  it('responde 404 si la fase es de otro torneo', async () => {
+    buscarFaseMock.mockResolvedValue(fase({ torneoId: 99 }));
+
+    expect((await errorAlResolver([1, 2])).statusCode).toBe(404);
   });
 });

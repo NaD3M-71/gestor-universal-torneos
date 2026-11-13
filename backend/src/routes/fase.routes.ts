@@ -1,8 +1,9 @@
 import { Router } from 'express';
-import { cerrar, empates } from '@controllers/fase.controller';
+import { cerrar, desempatar, empates } from '@controllers/fase.controller';
 import { handleInputErrors } from '../middlewares/errors/handleInputErrors';
 import {
   validarCierreDeFase,
+  validarDesempate,
   validarEmpatesDeFase,
 } from '../validators/fase.validator';
 
@@ -15,6 +16,12 @@ router.get(
   validarEmpatesDeFase,
   handleInputErrors,
   empates
+);
+router.put(
+  '/:faseId/desempate',
+  validarDesempate,
+  handleInputErrors,
+  desempatar
 );
 router.patch('/:faseId/cerrar', validarCierreDeFase, handleInputErrors, cerrar);
 

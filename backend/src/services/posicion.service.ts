@@ -261,6 +261,30 @@ export const detectarEmpatesRelevantes = (
 };
 
 /**
+ * Tabla de posiciones de una fase junto con los partidos jugados que la
+ * originan, calculada en el momento.
+ */
+export const calcularTablaDeFase = async (
+  torneoId: number,
+  fase: FasePublica,
+  sistemaPuntuacion: SistemaPuntuacion
+): Promise<{ filas: FilaPosicion[]; jugados: EnfrentamientoJugado[] }> => {
+  const [equipos, jugados] = await Promise.all([
+    posicionRepository.listarEquiposParaTabla(torneoId),
+    posicionRepository.listarEnfrentamientosJugados(fase.id),
+  ]);
+
+  return {
+    filas: calcularPosiciones(
+      equipos,
+      jugados,
+      PUNTOS_POR_SISTEMA[sistemaPuntuacion]
+    ),
+    jugados,
+  };
+};
+
+/**
  * Empates relevantes de una fase de liga o grupos, calculados en el momento.
  * Sin línea de corte en la fase se usa LINEA_DE_CORTE_POR_DEFECTO (solo
  * importa un empate en el 1.° puesto). Devuelve también la línea usada.
@@ -270,16 +294,12 @@ export const calcularEmpatesDeFase = async (
   fase: FasePublica,
   sistemaPuntuacion: SistemaPuntuacion
 ): Promise<EmpatesDeFase> => {
-  const [equipos, jugados] = await Promise.all([
-    posicionRepository.listarEquiposParaTabla(torneoId),
-    posicionRepository.listarEnfrentamientosJugados(fase.id),
-  ]);
-  const lineaDeCorte = fase.lineaDeCorte ?? LINEA_DE_CORTE_POR_DEFECTO;
-  const filas = calcularPosiciones(
-    equipos,
-    jugados,
-    PUNTOS_POR_SISTEMA[sistemaPuntuacion]
+  const { filas, jugados } = await calcularTablaDeFase(
+    torneoId,
+    fase,
+    sistemaPuntuacion
   );
+  const lineaDeCorte = fase.lineaDeCorte ?? LINEA_DE_CORTE_POR_DEFECTO;
 
   return {
     faseId: fase.id,

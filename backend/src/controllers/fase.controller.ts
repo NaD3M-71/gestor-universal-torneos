@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import { cerrarFase } from '@services/fase.service';
+import { cerrarFase, resolverDesempate } from '@services/fase.service';
 import { obtenerEmpates } from '@services/posicion.service';
 import { AppError } from '../middlewares/errors/AppError';
 
@@ -38,6 +38,33 @@ export const empates = async (req: Request, res: Response): Promise<void> => {
     Number(req.params.torneoId),
     usuarioIdDe(req),
     Number(req.params.faseId)
+  );
+
+  res.status(200).json(resultado);
+};
+
+/**
+ * PUT /api/torneos/:torneoId/fases/:faseId/desempate
+ * Cuerpo: { orden: number[], comentario?: string | null }. `orden` son los
+ * ids de los equipos de un empate pendiente, del mejor al peor: el sistema les
+ * asigna ventajas decrecientes. `comentario` reemplaza el de la fase (null lo
+ * borra; si no viene, queda el anterior). Responde 200 con { fase, empates }:
+ * los empates que siguen pendientes.
+ */
+export const desempatar = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  const { orden, comentario } = req.body as {
+    orden: number[];
+    comentario?: string | null;
+  };
+  const resultado = await resolverDesempate(
+    Number(req.params.torneoId),
+    Number(req.params.faseId),
+    usuarioIdDe(req),
+    orden,
+    comentario
   );
 
   res.status(200).json(resultado);
