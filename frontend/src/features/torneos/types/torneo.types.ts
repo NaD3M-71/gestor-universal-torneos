@@ -1,4 +1,5 @@
 export type EstadoTorneo = "borrador" | "en_curso" | "finalizado" | "cancelado";
+export type EstadoFase = "pendiente" | "activa" | "cerrada";
 export type FormatoTorneo =
   | "liga_simple"
   | "liga_doble"
@@ -8,6 +9,17 @@ export type FormatoTorneo =
   | "grupos_eliminatorias";
 export type SistemaPuntuacion =
   "ganada_perdida" | "futbol_clasico" | "sistema_alternativo";
+
+export interface Fase {
+  id: number;
+  torneoId: number;
+  tipo: string;
+  orden: number;
+  estado: EstadoFase;
+  lineaDeCorte: number | null;
+  idaYVuelta: boolean;
+  comentarioDesempate: string | null;
+}
 
 export interface Torneo {
   id: number;
@@ -20,7 +32,8 @@ export interface Torneo {
   fechaInicio: string | null;
   estado: EstadoTorneo;
   campeonId: number | null;
-  campeon?: { nombre: string } | null; // Si el backend incluye la relación
+  campeon?: { nombre: string } | null;
+  fases?: Fase[];
 }
 
 export interface CrearTorneoDTO {
@@ -29,9 +42,10 @@ export interface CrearTorneoDTO {
   formato: FormatoTorneo;
   sistemaPuntuacion: SistemaPuntuacion;
   cantidadParticipantes: number;
-  cantidadGrupos?: number | null;
-  lineaCorte?: number | null;
   fechaInicio?: string | null;
+  lineaDeCorte?: number | null;
+  idaYVuelta?: boolean;
+  cantidadGrupos?: number | null;
 }
 
 export type ActualizarTorneoDTO = Partial<CrearTorneoDTO>;
