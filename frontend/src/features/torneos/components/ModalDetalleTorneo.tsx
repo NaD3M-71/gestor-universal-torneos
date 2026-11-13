@@ -10,29 +10,41 @@ export const ModalDetalleTorneo: React.FC<ModalDetalleTorneoProps> = ({
   torneo,
   onClose,
 }) => {
+  const esBorrador = torneo.estado === "borrador";
+  const esEnCurso = torneo.estado === "en_curso";
   const esFinalizado = torneo.estado === "finalizado";
   const esCancelado = torneo.estado === "cancelado";
 
+  // Configuración de colores y títulos según el estado del torneo
+  const getHeaderConfig = () => {
+    if (esBorrador)
+      return { bg: "bg-amber-600", title: "📋 Detalle del Torneo (Borrador)" };
+    if (esEnCurso) return { bg: "bg-green-600", title: "⚡ Torneo en Curso" };
+    if (esFinalizado)
+      return { bg: "bg-blue-600", title: "🏆 Torneo Finalizado" };
+    return { bg: "bg-red-600", title: "🚫 Torneo Cancelado" };
+  };
+
+  const header = getHeaderConfig();
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden transform transition-all">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
+      <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full overflow-hidden transform transition-all my-8">
         {/* Cabecera del Modal */}
         <div
-          className={`px-6 py-4 flex justify-between items-center text-white ${esFinalizado ? "bg-blue-600" : "bg-red-600"}`}
+          className={`px-6 py-4 flex justify-between items-center text-white ${header.bg}`}
         >
-          <h3 className="text-lg font-bold">
-            {esFinalizado ? "🏆 Torneo Finalizado" : "🚫 Torneo Cancelado"}
-          </h3>
+          <h3 className="text-lg font-bold">{header.title}</h3>
           <button
             onClick={onClose}
             className="text-white hover:text-gray-200 text-xl font-bold px-2 rounded-lg transition-colors"
           >
-            X
+            ✕
           </button>
         </div>
 
         {/* Cuerpo del Modal */}
-        <div className="p-6 space-y-4">
+        <div className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
           <div>
             <h4 className="text-2xl font-bold text-gray-900">
               {torneo.nombre}
@@ -71,34 +83,41 @@ export const ModalDetalleTorneo: React.FC<ModalDetalleTorneoProps> = ({
             </div>
           </div>
 
+          {/* Mensaje informativo si está en Borrador */}
+          {esBorrador && (
+            <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg text-amber-900 text-xs">
+              ⚠️ <strong>Borrador activo:</strong> Las fases se encuentran
+              inicializadas en estado pendiente. Puedes hacer clic en{" "}
+              <strong>"Gestionar"</strong> desde la tabla principal para
+              inscribir a los equipos y configurar los grupos antes de dar
+              inicio oficial al torneo.
+            </div>
+          )}
+
           {/* Sección específica si está Finalizado */}
           {esFinalizado && (
             <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
-              <h5 className="font-bold text-blue-900 mb-1">Podium / Campeón</h5>
+              <h5 className="font-bold text-blue-900 mb-1 text-sm">
+                Podium / Campeón
+              </h5>
               <p className="text-blue-800 text-sm">
                 🥇 Campeón:{" "}
                 <span className="font-bold">
                   {torneo.campeon?.nombre ?? "Definido"}
                 </span>
               </p>
-              {/* Espacio para resumen del fixture final o enlace a resultados */}
-              <div className="mt-3 pt-3 border-t border-blue-200 text-xs text-blue-700">
-                El fixture y los enfrentamientos de la fase final se encuentran
-                archivados en el historial.
-              </div>
             </div>
           )}
 
           {/* Sección específica si está Cancelado */}
           {esCancelado && (
             <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
-              <h5 className="font-bold text-red-900 mb-1">
+              <h5 className="font-bold text-red-900 mb-1 text-sm">
                 Estado de Cancelación
               </h5>
-              <p className="text-red-700 text-sm">
+              <p className="text-red-700 text-xs">
                 Este torneo fue dado de baja durante su transcurso o antes de
-                completarse, por lo que su actividad se encuentra suspendida de
-                manera permanente.
+                completarse.
               </p>
             </div>
           )}
