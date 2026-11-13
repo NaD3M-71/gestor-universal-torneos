@@ -74,6 +74,12 @@ async function main() {
       sistemaPuntuacion: 'ganada_perdida',
       cantidadParticipantes: 8,
       estado: 'borrador',
+      // Las fases se crean con el torneo, pendientes y sin enfrentamientos.
+      fases: {
+        create: [
+          { tipo: 'eliminacion', orden: 1, estado: 'pendiente', idaYVuelta: false },
+        ],
+      },
     },
   });
 

@@ -121,7 +121,7 @@ erDiagram
 | **torneo_id** | INT | FK (TORNEO.id), NOT NULL | Vincula la fase con su torneo contenedor. La eliminación de un torneo remueve sus fases en cascada. |
 | **tipo** | VARCHAR(50) | NOT NULL | Determina la vista y el algoritmo de cálculo (liga, grupos, eliminacion). |
 | **orden** | INT | NOT NULL | Secuencia cronológica de la fase (1, 2, ...). Controla el flujo de avance del torneo. |
-| **estado** | VARCHAR(20) | NOT NULL, DEFAULT 'activa' | activa: permite carga y corrección de marcadores. cerrada: bloquea de forma inmutable los resultados de esa fase para no alterar la fase siguiente. |
+| **estado** | VARCHAR(20) | NOT NULL, DEFAULT 'activa' | pendiente: la fase ya existe (se crea junto con el torneo) pero todavía no empezó y no tiene enfrentamientos. activa: permite carga y corrección de marcadores. cerrada: bloquea de forma inmutable los resultados de esa fase para no alterar la fase siguiente. La aplicación crea todas las fases como pendiente; el default de la columna es 'activa'. |
 | **linea_de_corte** | INT | NULL | Configuración que establece cuántos equipos clasifican por grupo o tabla hacia la siguiente instancia (ej: "primeros 2 de cada grupo"). |
 | **ida_y_vuelta** | BOOLEAN | NOT NULL, DEFAULT false | Determina si las llaves eliminatorias de esta fase duplican enfrentamientos en modalidad revancha. |
 | **comentario_desempate** | TEXT | NULL | Registro de auditoría donde el organizador documenta el criterio utilizado en la resolución manual de empates en la línea de corte. |
@@ -169,6 +169,7 @@ erDiagram
 - La cantidad de grupos y la cantidad de clasificados por grupo deben ser potencias de 2, para que el total de clasificados a playoffs también lo sea y no haya que resolver un bye entre grupos distintos.
 - El emparejamiento entre grupos sigue la regla grupo i vs. grupo i + (cantidad de grupos / 2); dentro de cada par se cruza por posición inversa (el mejor ubicado contra el peor clasificado del grupo opuesto, y así hacia el medio).
 - La configuración del torneo se bloquea al iniciar. Cada fase se confirma antes de avanzar a la siguiente, y en ese momento sus resultados quedan bloqueados para edición.
+- Las fases se crean junto con el torneo, según su formato, todas en estado `pendiente` y sin enfrentamientos. Al iniciar el torneo se activa la primera y se genera su fixture; al cerrar una fase se genera el fixture de la siguiente y esta pasa a activa. La `linea_de_corte` se informa al crear el torneo y se guarda en la fase 1 (solo en liguilla + playoffs y en grupos + eliminatorias); en esos mismos formatos también se puede pedir `ida_y_vuelta` para la fase de eliminación (fase 2), que se guarda en esa fase (por defecto, solo ida). Mientras el torneo está en borrador, cambiar el formato o la línea de corte vuelve a generar sus fases.
 
 ## Especificación de formatos de competencia
 
@@ -209,7 +210,7 @@ Para garantizar una correcta interpretación de la lógica del sistema por parte
 - **Descripción:** combina una primera fase de todos contra todos (liga) con una segunda fase de eliminación directa entre los mejores clasificados.
 - **Fases del torneo:**
   - Fase 1 (`orden = 1`, `tipo = 'liga'`): se disputa la fase regular. Se define una `linea_de_corte` (ej.: "Clasifican los primeros 4").
-  - Fase 2 (`orden = 2`, `tipo = 'eliminacion'`): se genera recién cuando la Fase 1 es cerrada por el organizador.
+  - Fase 2 (`orden = 2`, `tipo = 'eliminacion'`): existe desde la creación del torneo, pendiente; su fixture se genera recién cuando la Fase 1 es cerrada por el organizador.
 - **Seeding dinámico por posición:** los enfrentamientos del bracket eliminatorio no se sortean; se arman en base a la tabla de posiciones de la Fase 1 (ej.: 1° vs 4°, 2° vs 3°). Si el número de clasificados no es potencia de 2, el/los mejor(es) posicionado(s) reciben el Bye como beneficio por su desempeño.
 
 ### 5. Fase de Grupos + Eliminatorias (Formato Mixto B)
@@ -237,12 +238,13 @@ A continuación se recorre, para cada formato soportado, qué filas se crean o a
      - `formato`: "liga_simple"
      - `sistema_puntuacion`: "futbol_clasico" (3 pts victoria, 1 pt empate, 0 pt derrota)
      - `cantidad_participantes`: 10
+   - El sistema crea el torneo en `borrador` junto con su fase: `FASE (torneo_id, tipo = 'liga', orden = 1, estado = 'pendiente')`.
 2. **Inscripción de equipos:**
    - El organizador registra los 10 nombres de los equipos en la tabla EQUIPO asociados a `torneo_id`.
 3. **Inicio de competencia y generación de fixture:**
    - El organizador presiona "Iniciar Torneo".
    - El sistema cambia `TORNEO.estado = 'en_curso'`.
-   - Se crea la primera fase: `FASE (torneo_id, tipo = 'liga', orden = 1, estado = 'activa')`.
+   - Se activa la primera fase: `FASE.estado` pasa de `'pendiente'` a `'activa'`.
    - Se ejecuta el algoritmo Round-Robin: para 10 equipos se generan C(10,2) = 45 enfrentamientos en 9 fechas.
    - Inserción masiva en ENFRENTAMIENTO:
      - Partidos de Fecha 1: `instancia = 'fecha_1'` (5 registros).
@@ -285,11 +287,11 @@ El proceso de creación es el mismo que el de la liga simple, pero se elige `for
      - `formato`: "eliminacion_simple"
      - `sistema_puntuacion`: "ganada_perdida"
      - `cantidad_participantes`: 7
-     - `TORNEO.estado`: 'en_curso'.
+     - `TORNEO.estado`: 'borrador' (pasa a 'en_curso' al iniciar).
 2. **Cálculo de bracket y generación de estructura:**
    - La potencia de 2 superior más cercana a 7 es 8.
    - Cantidad de Byes: 8 - 7 = 1.
-   - Se crea la fase: `FASE (tipo = 'eliminacion', orden = 1, ida_y_vuelta = false)`.
+   - La fase ya existe desde la creación del torneo: `FASE (tipo = 'eliminacion', orden = 1, ida_y_vuelta = false, estado = 'pendiente')`. Al iniciar se activa.
    - Se generan anticipadamente los 7 partidos del cuadro eliminatorio:
      - 4 partidos de Cuartos de Final (`instancia = 'cuartos'`): IDs 1, 2, 3, 4. A estos partidos se les asignan equipos.
      - 2 partidos de Semifinal (`instancia = 'semifinal'`): IDs 5 (`siguiente_id` de 1 y 2) y 6 (`siguiente_id` de 3 y 4). Estos y los demás partidos de rondas futuras adquieren los ids de equipos a medida que hay ganadores.
@@ -317,9 +319,9 @@ El proceso de creación es el mismo que el de la liga simple, pero se elige `for
      - `formato`: "eliminacion_doble"
      - `sistema_puntuacion`: "ganada_perdida"
      - `cantidad_participantes`: 7
-     - `TORNEO.estado`: 'en_curso'.
+     - `TORNEO.estado`: 'borrador' (pasa a 'en_curso' al iniciar).
 2. **Configuración de la fase:**
-   - El usuario crea el torneo con `Fase.ida_y_vuelta = true`.
+   - Al crear el torneo con `formato: "eliminacion_doble"`, su fase queda con `Fase.ida_y_vuelta = true`.
 3. **Generación del cruce (ida y vuelta):**
    - Se insertan dos filas en ENFRENTAMIENTO:
      - Fila 201 (Ida): `equipo_a_id = 10`, `equipo_b_id = 20`, `instancia = 'semifinal_ida'`.
@@ -346,8 +348,8 @@ El proceso de creación es el mismo que el de la liga simple, pero se elige `for
 **Flujo operativo paso a paso:**
 
 1. **Inicio en Fase 1 (Liguilla):**
-   - El usuario crea el torneo completando `formato: "liguilla_eliminacion"`.
-   - `FASE 1: tipo = 'liga', linea_de_corte = 4`. Se disputan los 21 partidos de la rueda.
+   - El usuario crea el torneo completando `formato: "liguilla_eliminacion"` y `lineaDeCorte: 4`. El sistema crea `FASE 1: tipo = 'liga', linea_de_corte = 4` y `FASE 2: tipo = 'eliminacion', orden = 2`, ambas pendientes.
+   - Al iniciar el torneo se activa la Fase 1 y se disputan los 21 partidos de la rueda.
 2. **Finalización de Fase 1 y detección de empate relevante:**
    - Se completa el último partido. La tabla muestra:
      - 1° Puesto: Jugador A (15 pts)
@@ -370,7 +372,7 @@ El proceso de creación es el mismo que el de la liga simple, pero se elige `for
 4. **Cierre de Fase 1 y generación de Fase 2 (Playoffs):**
    - El organizador confirma el avance a la siguiente fase.
    - Se actualiza `FASE_1.estado = 'cerrada'` (se bloquean todos los marcadores de la liguilla).
-   - Se crea automáticamente la `FASE 2: tipo = 'eliminacion', orden = 2`.
+   - Se genera el fixture de la `FASE 2: tipo = 'eliminacion', orden = 2` (ya creada, pendiente) y pasa a activa.
    - Se arman los cruces de Semifinales según el seeding de la Fase 1:
      - Semifinal 1: 1° Puesto (Jugador A) vs. 4° Puesto (Jugador D).
      - Semifinal 2: 2° Puesto (Jugador B) vs. 3° Puesto (Jugador C).
@@ -382,10 +384,10 @@ El proceso de creación es el mismo que el de la liga simple, pero se elige `for
 **Flujo operativo paso a paso:**
 
 1. **Configuración inicial:**
-   - Torneo: `formato = 'grupos_eliminatorias'`, `cantidad_participantes = 8`, `cantidad_grupos = 2`.
+   - Torneo: `formato = 'grupos_eliminatorias'`, `cantidad_participantes = 8`, `cantidad_grupos = 2`, `lineaDeCorte = 2` (clasificados por grupo). El sistema crea la `FASE 1` (grupos) y la `FASE 2` (eliminación), ambas pendientes.
    - En la tabla EQUIPO, 4 equipos reciben `grupo = 1` (Grupo A) y 4 equipos reciben `grupo = 2` (Grupo B).
 2. **Fase 1 (fase de zonas):**
-   - `FASE 1: tipo = 'grupos', orden = 1, linea_de_corte = 2`.
+   - Al iniciar el torneo se activa `FASE 1: tipo = 'grupos', orden = 1, linea_de_corte = 2`.
    - Se generan 12 partidos (6 para el Grupo A, 6 para el Grupo B).
    - La vista pública muestra dos tablas de posiciones independientes filtradas por `EQUIPO.grupo`.
 3. **Cierre de grupos y generación de playoffs con cruce inter-grupo:**
@@ -393,7 +395,7 @@ El proceso de creación es el mismo que el de la liga simple, pero se elige `for
    - Se clasifican:
      - Grupo A: 1°A (Equipo Redes) y 2°A (Equipo Malla).
      - Grupo B: 1°B (Equipo Remate) y 2°B (Equipo Bloqueo).
-   - Se crea la `FASE 2: tipo = 'eliminacion', orden = 2`.
+   - Se genera el fixture de la `FASE 2: tipo = 'eliminacion', orden = 2` (ya creada, pendiente) y pasa a activa.
    - El sistema aplica la regla de emparejamiento cruzado:
      - Semifinal 1: 1°A (Equipo Redes) vs. 2°B (Equipo Bloqueo).
      - Semifinal 2: 1°B (Equipo Remate) vs. 2°A (Equipo Malla).

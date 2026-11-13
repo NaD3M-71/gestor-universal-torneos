@@ -20,6 +20,8 @@ const CAMPOS_EDITABLES = [
   'sistemaPuntuacion',
   'cantidadParticipantes',
   'cantidadGrupos',
+  'lineaDeCorte',
+  'idaYVuelta',
   'fechaInicio',
 ] as const;
 
@@ -36,7 +38,8 @@ const torneoIdDe = (req: Request): number => Number(req.params.id);
 
 /**
  * POST /api/torneos
- * Crea un torneo en borrador del organizador y responde 201 con el torneo.
+ * Crea un torneo en borrador del organizador, con sus fases (pendientes), y
+ * responde 201 con el torneo.
  */
 export const crear = async (req: Request, res: Response): Promise<void> => {
   const {
@@ -46,6 +49,8 @@ export const crear = async (req: Request, res: Response): Promise<void> => {
     sistemaPuntuacion,
     cantidadParticipantes,
     cantidadGrupos,
+    lineaDeCorte,
+    idaYVuelta,
     fechaInicio,
   } = req.body;
 
@@ -57,6 +62,8 @@ export const crear = async (req: Request, res: Response): Promise<void> => {
     sistemaPuntuacion,
     cantidadParticipantes,
     cantidadGrupos,
+    lineaDeCorte,
+    idaYVuelta,
     fechaInicio,
   });
 
@@ -120,7 +127,7 @@ export const cancelar = async (req: Request, res: Response): Promise<void> => {
 
 /**
  * PATCH /api/torneos/:id/iniciar
- * Inicia el torneo y crea su primera fase. Responde 200 con { torneo, fase }.
+ * Inicia el torneo y activa su primera fase. Responde 200 con { torneo, fase }.
  */
 export const iniciar = async (req: Request, res: Response): Promise<void> => {
   const { torneo, fase } = await iniciarTorneo(

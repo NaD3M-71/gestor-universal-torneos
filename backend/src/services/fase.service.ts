@@ -47,7 +47,9 @@ const contarPendientes = (fase: FasePublica): Promise<number> =>
  *
  * Esta función solo cierra la fase. Lo que viene después se engancha acá en
  * las otras tarjetas: la generación de la fase siguiente (6.4 y 6.5) o el
- * cierre del torneo (6.6).
+ * cierre del torneo (6.6). La fase siguiente ya existe, pendiente y sin
+ * enfrentamientos, desde que se creó el torneo: generarla es crear sus
+ * enfrentamientos y pasarla a activa, no crear la fase.
  */
 export const cerrarFase = async (
   torneoId: number,

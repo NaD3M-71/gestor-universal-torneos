@@ -317,6 +317,42 @@ describe('elegirFase', () => {
   it('responde 409 si el torneo todavía no tiene fases', () => {
     expect(codigoDe(() => elegirFase([]))).toBe(409);
   });
+
+  it('sin faseId no elige una fase pendiente: usa la activa', () => {
+    const conPendiente = [
+      fase(12, { orden: 2, estado: 'pendiente' }),
+      fase(11, { orden: 1 }),
+    ];
+
+    expect(elegirFase(conPendiente).id).toBe(11);
+  });
+
+  it('sin faseId y sin fase activa elige la última que ya empezó, no la pendiente', () => {
+    const conPendiente = [
+      fase(12, { orden: 2, estado: 'pendiente' }),
+      fase(11, { orden: 1, estado: 'cerrada' }),
+    ];
+
+    expect(elegirFase(conPendiente).id).toBe(11);
+  });
+
+  it('responde 409 si todas las fases están pendientes (el torneo no empezó)', () => {
+    const pendientes = [
+      fase(12, { orden: 2, estado: 'pendiente' }),
+      fase(11, { orden: 1, estado: 'pendiente' }),
+    ];
+
+    expect(codigoDe(() => elegirFase(pendientes))).toBe(409);
+  });
+
+  it('devuelve una fase pendiente si se pide por faseId', () => {
+    const conPendiente = [
+      fase(12, { orden: 2, estado: 'pendiente' }),
+      fase(11, { orden: 1 }),
+    ];
+
+    expect(elegirFase(conPendiente, 12).id).toBe(12);
+  });
 });
 
 describe('obtenerPosiciones', () => {

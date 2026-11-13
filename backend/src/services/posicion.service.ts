@@ -14,6 +14,7 @@ import type {
 } from '../types/posicion';
 
 const ESTADO_FASE_ACTIVA = 'activa';
+const ESTADO_FASE_PENDIENTE = 'pendiente';
 const TIPO_FASE_ELIMINACION = 'eliminacion';
 
 /** Línea de corte de una fase que no tiene: solo importa el 1.° puesto. */
@@ -50,7 +51,8 @@ const acumuladoVacio = (): Acumulado => ({
 
 /**
  * Elige la fase de la tabla: la pedida por faseId (404 si no es del torneo) o,
- * si no se pide ninguna, la activa y, si no hay activa, la última.
+ * si no se pide ninguna, la activa y, si no hay activa, la última que ya
+ * empezó. Las fases pendientes (todavía sin fixture) no se eligen solas.
  */
 export const elegirFase = (
   fases: FasePublica[],
@@ -64,10 +66,12 @@ export const elegirFase = (
     return pedida;
   }
 
-  const fase = fases.find((f) => f.estado === ESTADO_FASE_ACTIVA) ?? fases[0];
+  const empezadas = fases.filter((f) => f.estado !== ESTADO_FASE_PENDIENTE);
+  const fase =
+    empezadas.find((f) => f.estado === ESTADO_FASE_ACTIVA) ?? empezadas[0];
   if (fase === undefined) {
     throw new AppError(
-      'El torneo todavía no tiene fases: iniciá el torneo primero.',
+      'El torneo todavía no tiene fases en juego: iniciá el torneo primero.',
       409
     );
   }

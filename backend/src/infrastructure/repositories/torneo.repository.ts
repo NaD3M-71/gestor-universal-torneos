@@ -12,13 +12,32 @@ import type {
 import { prisma } from '../database';
 import { EstadoTorneo } from '@prisma/enums';
 
+/** Estado con el que nace toda fase: pasa a activa cuando empieza a jugarse. */
+const ESTADO_FASE_PENDIENTE = 'pendiente';
+const ESTADO_FASE_ACTIVA = 'activa';
+
+/** Trae las fases del torneo, de la primera a la última. */
+const INCLUIR_FASES = { fases: { orderBy: { orden: 'asc' } } } as const;
+
+/** Las fases nuevas nacen pendientes. */
+const comoPendientes = (fases: DatosNuevaFase[]) =>
+  fases.map((fase) => ({ ...fase, estado: ESTADO_FASE_PENDIENTE }));
+
 /**
- * Guarda un torneo nuevo. El estado no se envía: la base lo deja en borrador.
- * Los DTO de types/torneo.ts tienen los mismos nombres de campo que el modelo
- * de Prisma, por eso se pasan directo como data.
+ * Guarda un torneo nuevo junto con sus fases (todas pendientes), en una sola
+ * operación. El estado del torneo no se envía: la base lo deja en borrador.
+ * Los campos de types/torneo.ts tienen los mismos nombres que el modelo de
+ * Prisma, por eso se pasan directo como data. La línea de corte y la ida y
+ * vuelta no son columnas del torneo: viajan dentro de las fases.
  */
-export const crearTorneo = (datos: DatosNuevoTorneo): Promise<TorneoPublico> =>
-  prisma.torneo.create({ data: datos });
+export const crearTorneo = (
+  datos: Omit<DatosNuevoTorneo, 'lineaDeCorte' | 'idaYVuelta'>,
+  fases: DatosNuevaFase[]
+): Promise<TorneoPublico> =>
+  prisma.torneo.create({
+    data: { ...datos, fases: { create: comoPendientes(fases) } },
+    include: INCLUIR_FASES,
+  });
 
 /** Torneos de un organizador, del más nuevo al más viejo. */
 export const listarTorneosDeCreador = (
@@ -48,15 +67,32 @@ export const buscarTorneoPorId = (id: number): Promise<TorneoPublico | null> =>
           nombre: true,
         },
       },
+      ...INCLUIR_FASES,
     },
   });
 
-/** Aplica los cambios recibidos (parciales) y devuelve el torneo actualizado. */
+/**
+ * Aplica los cambios recibidos (parciales) y devuelve el torneo actualizado.
+ * Si vienen fases, reemplaza todas las del torneo por esas (nuevas y
+ * pendientes) en la misma operación: solo se usa con el torneo en borrador,
+ * cuando las fases todavía no tienen enfrentamientos.
+ */
 export const actualizarTorneo = (
   id: number,
-  datos: DatosActualizarTorneo
+  datos: Omit<DatosActualizarTorneo, 'lineaDeCorte' | 'idaYVuelta'>,
+  fases?: DatosNuevaFase[]
 ): Promise<TorneoPublico> =>
-  prisma.torneo.update({ where: { id }, data: datos });
+  prisma.torneo.update({
+    where: { id },
+    data:
+      fases === undefined
+        ? datos
+        : {
+            ...datos,
+            fases: { deleteMany: {}, create: comoPendientes(fases) },
+          },
+    include: INCLUIR_FASES,
+  });
 
 /** Cambia el estado de un torneo. */
 export const cambiarEstadoTorneo = (
@@ -67,31 +103,32 @@ export const cambiarEstadoTorneo = (
 
 /**
  * Inicia un torneo: lo pasa a en_curso, fija la cantidad real de participantes
- * y crea su primera fase junto con sus enfrentamientos (si los hay). Todo en
- * una transacción, así no queda a medias.
+ * y activa su primera fase (que ya existe, pendiente) junto con la creación de
+ * sus enfrentamientos (si los hay). Todo en una transacción, así no queda a
+ * medias.
  */
 export const iniciarTorneo = async (
   id: number,
   cantidadParticipantes: number,
-  fase: DatosNuevaFase,
+  faseId: number,
   enfrentamientos: DatosNuevoEnfrentamiento[] = []
 ): Promise<TorneoIniciado> => {
-  const [torneo, faseCreada] = await prisma.$transaction([
+  const [torneo, faseActivada] = await prisma.$transaction([
     prisma.torneo.update({
       where: { id },
       data: { estado: EstadoTorneo.en_curso, cantidadParticipantes },
     }),
     // Los enfrentamientos se crean anidados en la fase, que les pone su faseId.
-    prisma.fase.create({
+    prisma.fase.update({
+      where: { id: faseId },
       data: {
-        torneoId: id,
-        ...fase,
+        estado: ESTADO_FASE_ACTIVA,
         enfrentamientos: { create: enfrentamientos },
       },
     }),
   ]);
 
-  return { torneo, fase: faseCreada };
+  return { torneo, fase: faseActivada };
 };
 
 /**
@@ -103,7 +140,7 @@ export const iniciarTorneo = async (
 export const iniciarTorneoConBracket = (
   id: number,
   cantidadParticipantes: number,
-  fase: DatosNuevaFase,
+  faseId: number,
   partidos: DatosNuevoPartidoBracket[]
 ): Promise<TorneoIniciado> =>
   prisma.$transaction(async (tx) => {
@@ -111,8 +148,9 @@ export const iniciarTorneoConBracket = (
       where: { id },
       data: { estado: EstadoTorneo.en_curso, cantidadParticipantes },
     });
-    const faseCreada = await tx.fase.create({
-      data: { torneoId: id, ...fase },
+    const faseCreada = await tx.fase.update({
+      where: { id: faseId },
+      data: { estado: ESTADO_FASE_ACTIVA },
     });
 
     // Se guarda de la final hacia la primera ronda, así cuando se crea un
