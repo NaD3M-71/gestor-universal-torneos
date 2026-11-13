@@ -15,6 +15,7 @@ import grupoRoutes from './grupo.routes';
 import enfrentamientoRoutes from './enfrentamiento.routes';
 import posicionRoutes from './posicion.routes';
 import bracketRoutes from './bracket.routes';
+import faseRoutes from './fase.routes';
 import {
   validarAltaTorneo,
   validarEdicionTorneo,
@@ -40,6 +41,9 @@ router.use('/:torneoId/posiciones', posicionRoutes);
 
 // Cuadro de una fase de eliminación: /api/torneos/:torneoId/bracket
 router.use('/:torneoId/bracket', bracketRoutes);
+
+// Cierre de fases: /api/torneos/:torneoId/fases/:faseId/cerrar
+router.use('/:torneoId/fases', faseRoutes);
 
 router.post('/', validarAltaTorneo, handleInputErrors, crear);
 router.get('/', listar);
