@@ -23,8 +23,11 @@ export const crearTorneoSchema = z
     ]),
     fechaInicio: z.string().optional(),
 
-    participantesPorGrupo: z.number().min(2, "Mínimo 2 por grupo.").optional(),
-    cantidadGrupos: z.number().nullable().optional(),
+    participantesPorGrupo: z
+      .number("Ingrese un valor válido")
+      .min(2, "Mínimo 2 por grupo.")
+      .optional(),
+    cantidadGrupos: z.number("Ingrese un valor válido").nullable().optional(),
     cantidadParticipantes: z
       .number("Debe ser un numero entero entre 2 y 128")
       .min(2, "El torneo requiere al menos 2 participantes.")
@@ -33,9 +36,11 @@ export const crearTorneoSchema = z
         "El torneo no puede superar el límite de 128 participantes en total.",
       ),
     lineaCorte: z
-      .number()
-      .min(1, "Debe clasificar al menos 1 por grupo.")
+      .number("Ingrese un valor válido")
+      .min(1, "Debe clasificar al menos 1 equipo.")
+      .nullable()
       .optional(),
+    idaYVuelta: z.boolean().optional(),
   })
   .superRefine((data, ctx) => {
     // FASE DE GRUPOS + ELIMINATORIAS
@@ -47,7 +52,6 @@ export const crearTorneoSchema = z
           message: "Seleccioná la cantidad de grupos.",
         });
       } else if (!esPotenciaDeDos(data.cantidadGrupos)) {
-        // Seguridad adicional si se altera el selector
         ctx.addIssue({
           code: "custom",
           path: ["cantidadGrupos"],
@@ -56,29 +60,53 @@ export const crearTorneoSchema = z
         });
       }
 
-      if (data.participantesPorGrupo && data.lineaCorte) {
-        if (data.lineaCorte >= data.participantesPorGrupo) {
-          ctx.addIssue({
-            code: "custom",
-            path: ["lineaCorte"],
-            message:
-              "No pueden clasificar todos ni más de los que integran el grupo.",
-          });
-        }
+      if (
+        data.lineaCorte === null ||
+        data.lineaCorte === undefined ||
+        isNaN(data.lineaCorte) ||
+        data.lineaCorte < 1
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["lineaCorte"],
+          message: "La línea de corte es obligatoria en este formato.",
+        });
+      } else if (
+        data.participantesPorGrupo &&
+        data.lineaCorte >= data.participantesPorGrupo
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["lineaCorte"],
+          message:
+            "No pueden clasificar todos ni más de los que integran el grupo.",
+        });
       }
     }
 
     // LIGUILLA + PLAYOFFS
     if (data.formato === "liguilla_eliminacion") {
-      if (data.lineaCorte && data.cantidadParticipantes) {
-        if (data.lineaCorte >= data.cantidadParticipantes) {
-          ctx.addIssue({
-            code: "custom",
-            path: ["lineaCorte"],
-            message:
-              "Los clasificados deben ser menores al total de participantes en fase regular.",
-          });
-        }
+      if (
+        data.lineaCorte === null ||
+        data.lineaCorte === undefined ||
+        isNaN(data.lineaCorte) ||
+        data.lineaCorte < 2
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["lineaCorte"],
+          message: "La línea de corte es obligatoria y debe ser al menos 2.",
+        });
+      } else if (
+        data.cantidadParticipantes &&
+        data.lineaCorte >= data.cantidadParticipantes
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["lineaCorte"],
+          message:
+            "Los clasificados deben ser menores al total de participantes en fase regular.",
+        });
       }
     }
   });

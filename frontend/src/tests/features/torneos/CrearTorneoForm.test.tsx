@@ -123,4 +123,92 @@ describe("CrearTorneoView (Formulario)", () => {
     ).toBeInTheDocument();
     expect(crearTorneoSpy).not.toHaveBeenCalled();
   });
+
+  it("envía lineaDeCorte e idaYVuelta cuando se configura Liguilla + Playoffs y resetea al cambiar de formato", async () => {
+    const crearTorneoSpy = vi
+      .spyOn(torneoService, "crearTorneo")
+      .mockResolvedValue({ id: 99 } as unknown as Awaited<
+        ReturnType<typeof torneoService.crearTorneo>
+      >);
+    const user = userEvent.setup();
+    renderComponent();
+
+    // En formato inicial (liga_simple) no debe existir el checkbox de ida y vuelta
+    expect(
+      screen.queryByLabelText(/jugar los cruces de eliminación/i),
+    ).not.toBeInTheDocument();
+
+    await user.type(
+      screen.getByPlaceholderText(/ej: torneo relámpago f5/i),
+      "Copa Verano",
+    );
+
+    // Cambiar a Liguilla + Playoffs
+    const formatoSelect = screen.getByDisplayValue(/liga simple/i);
+    await user.selectOptions(formatoSelect, "liguilla_eliminacion");
+
+    // Configurar 12 equipos y 4 clasificados
+    const participantesInput = screen.getByPlaceholderText(/ej: 16/i);
+    await user.clear(participantesInput);
+    await user.type(participantesInput, "12");
+
+    const corteInput = screen.getByPlaceholderText(/ej: 8/i);
+    await user.clear(corteInput);
+    await user.type(corteInput, "4");
+
+    // Marcar ida y vuelta en playoffs
+    const idaYVueltaCheckbox = screen.getByLabelText(
+      /jugar los cruces de eliminación/i,
+    );
+    await user.click(idaYVueltaCheckbox);
+    expect(idaYVueltaCheckbox).toBeChecked();
+
+    await user.click(screen.getByRole("button", { name: /crear torneo/i }));
+
+    expect(crearTorneoSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        nombre: "Copa Verano",
+        formato: "liguilla_eliminacion",
+        cantidadParticipantes: 12,
+        cantidadGrupos: null,
+        lineaDeCorte: 4,
+        idaYVuelta: true,
+      }),
+    );
+  });
+
+  it("envía lineaDeCorte en null e idaYVuelta en false para formatos simples", async () => {
+    const crearTorneoSpy = vi
+      .spyOn(torneoService, "crearTorneo")
+      .mockResolvedValue({ id: 100 } as unknown as Awaited<
+        ReturnType<typeof torneoService.crearTorneo>
+      >);
+    const user = userEvent.setup();
+    renderComponent();
+
+    await user.type(
+      screen.getByPlaceholderText(/ej: torneo relámpago f5/i),
+      "Liga Apertura",
+    );
+
+    // Pasar primero por un formato mixto y tildar idaYVuelta para verificar limpieza
+    const formatoSelect = screen.getByDisplayValue(/liga simple/i);
+    await user.selectOptions(formatoSelect, "grupos_eliminatorias");
+    await user.click(screen.getByLabelText(/jugar los cruces de eliminación/i));
+
+    // Volver a liga_doble (donde idaYVuelta lo define el formato y no debe enviarse en true)
+    await user.selectOptions(formatoSelect, "liga_doble");
+
+    await user.click(screen.getByRole("button", { name: /crear torneo/i }));
+
+    expect(crearTorneoSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        nombre: "Liga Apertura",
+        formato: "liga_doble",
+        cantidadGrupos: null,
+        lineaDeCorte: null,
+        idaYVuelta: false,
+      }),
+    );
+  });
 });
