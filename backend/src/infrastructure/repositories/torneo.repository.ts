@@ -10,6 +10,7 @@ import type {
   TorneoIniciado,
 } from '../../types/fase';
 import { prisma } from '../database';
+import { guardarPartidosDeBracket } from './enfrentamiento.repository';
 import { EstadoTorneo } from '@prisma/enums';
 
 /** Estado con el que nace toda fase: pasa a activa cuando empieza a jugarse. */
@@ -134,8 +135,7 @@ export const iniciarTorneo = async (
 /**
  * Inicia un torneo cuya primera fase es una eliminatoria: igual que
  * iniciarTorneo, pero guarda el cuadro completo (todas las rondas) con los
- * partidos encadenados por siguienteId. Si el cuadro es a ida y vuelta, cada
- * vuelta queda enlazada a su ida con vueltaDeId. Todo en una transacción.
+ * partidos encadenados (ver guardarPartidosDeBracket). Todo en una transacción.
  */
 export const iniciarTorneoConBracket = (
   id: number,
@@ -153,38 +153,7 @@ export const iniciarTorneoConBracket = (
       data: { estado: ESTADO_FASE_ACTIVA },
     });
 
-    // Se guarda de la final hacia la primera ronda, así cuando se crea un
-    // partido el que sigue ya tiene id. Dentro de cada ronda se mantiene el
-    // orden: de cada par, el de menor id es el que entra como equipo A al
-    // partido siguiente (el de mayor id entra como B). En ida y vuelta la ida
-    // tiene menor indice que su vuelta, así que ya existe cuando se la enlaza.
-    const orden = [...partidos].sort(
-      (a, b) => b.ronda - a.ronda || a.indice - b.indice
-    );
-    const idPorIndice = new Map<number, number>();
-
-    for (const partido of orden) {
-      const creado = await tx.enfrentamiento.create({
-        data: {
-          faseId: faseCreada.id,
-          equipoAId: partido.equipoAId,
-          equipoBId: partido.equipoBId,
-          ganadorId: partido.ganadorId,
-          instancia: partido.instancia,
-          siguienteId:
-            partido.siguienteIndice === null
-              ? null
-              : (idPorIndice.get(partido.siguienteIndice) ?? null),
-          vueltaDeId:
-            partido.vueltaDeIndice === undefined ||
-            partido.vueltaDeIndice === null
-              ? null
-              : (idPorIndice.get(partido.vueltaDeIndice) ?? null),
-        },
-        select: { id: true },
-      });
-      idPorIndice.set(partido.indice, creado.id);
-    }
+    await guardarPartidosDeBracket(tx, faseCreada.id, partidos);
 
     return { torneo, fase: faseCreada };
   });

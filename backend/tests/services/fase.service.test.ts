@@ -23,6 +23,8 @@ vi.mock('@repositories/fase.repository', () => ({
   contarPendientesDeEliminacion: vi.fn(),
   cerrarFase: vi.fn(),
   guardarDesempate: vi.fn(),
+  buscarFasePorOrden: vi.fn(),
+  cerrarFaseYActivarSiguiente: vi.fn(),
 }));
 vi.mock('@services/torneo.service', () => ({
   obtenerTorneo: vi.fn(),
@@ -43,6 +45,10 @@ const pendientesEliminacionMock = vi.mocked(
 const cerrarFaseMock = vi.mocked(faseRepository.cerrarFase);
 const tablaMock = vi.mocked(calcularTablaDeFase);
 const guardarMock = vi.mocked(faseRepository.guardarDesempate);
+const porOrdenMock = vi.mocked(faseRepository.buscarFasePorOrden);
+const cerrarYActivarMock = vi.mocked(
+  faseRepository.cerrarFaseYActivarSiguiente
+);
 
 const USUARIO_ID = 7;
 const TORNEO_ID = 1;
@@ -102,6 +108,7 @@ describe('cerrarFase', () => {
     pendientesLigaMock.mockResolvedValue(0);
     pendientesEliminacionMock.mockResolvedValue(0);
     cerrarFaseMock.mockResolvedValue(fase({ estado: 'cerrada' }));
+    porOrdenMock.mockResolvedValue(null);
     empatesMock.mockResolvedValue({
       faseId: FASE_ID,
       lineaDeCorte: 1,
@@ -112,7 +119,8 @@ describe('cerrarFase', () => {
   it('cierra una fase de liga con todos los partidos jugados', async () => {
     const resultado = await cerrarFase(TORNEO_ID, FASE_ID, USUARIO_ID);
 
-    expect(resultado.estado).toBe('cerrada');
+    expect(resultado.fase.estado).toBe('cerrada');
+    expect(resultado.faseSiguiente).toBeNull();
     expect(obtenerTorneoMock).toHaveBeenCalledWith(TORNEO_ID, USUARIO_ID);
     expect(pendientesLigaMock).toHaveBeenCalledWith(FASE_ID);
     expect(pendientesEliminacionMock).not.toHaveBeenCalled();
@@ -133,7 +141,8 @@ describe('cerrarFase', () => {
 
     const resultado = await cerrarFase(TORNEO_ID, FASE_ID, USUARIO_ID);
 
-    expect(resultado.estado).toBe('cerrada');
+    expect(resultado.fase.estado).toBe('cerrada');
+    expect(resultado.faseSiguiente).toBeNull();
     expect(pendientesEliminacionMock).toHaveBeenCalledWith(FASE_ID);
     expect(pendientesLigaMock).not.toHaveBeenCalled();
   });
@@ -224,6 +233,7 @@ describe('cerrarFase con empates en puntos', () => {
     pendientesLigaMock.mockResolvedValue(0);
     pendientesEliminacionMock.mockResolvedValue(0);
     cerrarFaseMock.mockResolvedValue(fase({ estado: 'cerrada' }));
+    porOrdenMock.mockResolvedValue(null);
     empatesMock.mockResolvedValue({
       faseId: FASE_ID,
       lineaDeCorte: 1,
@@ -295,7 +305,8 @@ describe('cerrarFase con empates en puntos', () => {
 
     const resultado = await cerrarFase(TORNEO_ID, FASE_ID, USUARIO_ID);
 
-    expect(resultado.estado).toBe('cerrada');
+    expect(resultado.fase.estado).toBe('cerrada');
+    expect(resultado.faseSiguiente).toBeNull();
     expect(empatesMock).not.toHaveBeenCalled();
   });
 });
@@ -319,6 +330,128 @@ const fila = (
   enContra: 0,
   diferencia: 0,
   ventajaDesempate,
+});
+
+describe('cerrarFase de una liguilla (liga + eliminatoria)', () => {
+  const LIGA = fase({ lineaDeCorte: 4 });
+  const ELIMINATORIA = fase({
+    id: 11,
+    tipo: 'eliminacion',
+    orden: 2,
+    estado: 'pendiente',
+  });
+
+  // Tabla de 7 equipos ya ordenada: el equipo 101 es el 1.°, el 107 el 7.°.
+  const tabla = (): FilaPosicion[] =>
+    [101, 102, 103, 104, 105, 106, 107].map((id, i) =>
+      fila(id, i + 1, 21 - i * 3)
+    );
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    obtenerTorneoMock.mockResolvedValue(torneo());
+    buscarFaseMock.mockResolvedValue(LIGA);
+    pendientesLigaMock.mockResolvedValue(0);
+    empatesMock.mockResolvedValue({
+      faseId: FASE_ID,
+      lineaDeCorte: 4,
+      empates: [],
+    });
+    porOrdenMock.mockResolvedValue(ELIMINATORIA);
+    tablaMock.mockResolvedValue({ filas: tabla(), jugados: [] });
+    cerrarYActivarMock.mockResolvedValue({
+      fase: fase({ estado: 'cerrada' }),
+      faseSiguiente: { ...ELIMINATORIA, estado: 'activa' },
+    });
+  });
+
+  const partidosGuardados = () => cerrarYActivarMock.mock.calls[0]?.[2] ?? [];
+
+  it('cierra la liga y activa la eliminatoria con los clasificados', async () => {
+    const resultado = await cerrarFase(TORNEO_ID, FASE_ID, USUARIO_ID);
+
+    expect(porOrdenMock).toHaveBeenCalledWith(TORNEO_ID, 2);
+    expect(cerrarYActivarMock).toHaveBeenCalledWith(
+      FASE_ID,
+      ELIMINATORIA.id,
+      expect.any(Array)
+    );
+    expect(cerrarFaseMock).not.toHaveBeenCalled();
+    expect(resultado.fase.estado).toBe('cerrada');
+    expect(resultado.faseSiguiente?.estado).toBe('activa');
+  });
+
+  it('siembra por posición: 1.° contra el 4.° y 2.° contra el 3.°', async () => {
+    await cerrarFase(TORNEO_ID, FASE_ID, USUARIO_ID);
+
+    const primeraRonda = partidosGuardados().filter((p) => p.ronda === 1);
+    expect(primeraRonda.map((p) => [p.equipoAId, p.equipoBId])).toEqual([
+      [101, 104],
+      [102, 103],
+    ]);
+  });
+
+  it('solo entran los clasificados: el 5.° al 7.° quedan afuera', async () => {
+    await cerrarFase(TORNEO_ID, FASE_ID, USUARIO_ID);
+
+    const ids = partidosGuardados().flatMap((p) => [p.equipoAId, p.equipoBId]);
+    expect(ids).not.toContain(105);
+    expect(ids).not.toContain(107);
+  });
+
+  it('da el bye a los mejor ubicados si no son potencia de 2', async () => {
+    buscarFaseMock.mockResolvedValue(fase({ lineaDeCorte: 6 }));
+
+    await cerrarFase(TORNEO_ID, FASE_ID, USUARIO_ID);
+
+    // Con 6 clasificados hay 2 byes: para el 1.° y el 2.°.
+    const byes = partidosGuardados().filter(
+      (p) => p.ronda === 1 && p.ganadorId !== null
+    );
+    expect(byes.map((p) => p.ganadorId).sort()).toEqual([101, 102]);
+  });
+
+  it('arma el cuadro a ida y vuelta si la eliminatoria lo pide', async () => {
+    porOrdenMock.mockResolvedValue({ ...ELIMINATORIA, idaYVuelta: true });
+
+    await cerrarFase(TORNEO_ID, FASE_ID, USUARIO_ID);
+
+    const instancias = partidosGuardados().map((p) => p.instancia);
+    expect(instancias).toContain('semifinal_ida');
+    expect(instancias).toContain('semifinal_vuelta');
+  });
+
+  it('responde 409 si la liga no tiene línea de corte', async () => {
+    buscarFaseMock.mockResolvedValue(fase({ lineaDeCorte: null }));
+
+    const error = await errorAlCerrar();
+
+    expect(error.statusCode).toBe(409);
+    expect(cerrarYActivarMock).not.toHaveBeenCalled();
+    expect(cerrarFaseMock).not.toHaveBeenCalled();
+  });
+
+  it('responde 409 si la fase siguiente no está pendiente', async () => {
+    porOrdenMock.mockResolvedValue({ ...ELIMINATORIA, estado: 'activa' });
+
+    const error = await errorAlCerrar();
+
+    expect(error.statusCode).toBe(409);
+    expect(cerrarYActivarMock).not.toHaveBeenCalled();
+  });
+
+  it('con un empate relevante sin resolver no cierra ni arma nada', async () => {
+    empatesMock.mockResolvedValue({
+      faseId: FASE_ID,
+      lineaDeCorte: 4,
+      empates: [empate()],
+    });
+
+    const error = await errorAlCerrar();
+
+    expect(error.statusCode).toBe(409);
+    expect(cerrarYActivarMock).not.toHaveBeenCalled();
+  });
 });
 
 describe('calcularVentajasDeDesempate', () => {

@@ -1,3 +1,5 @@
+import type { Prisma } from '@prisma/client';
+import type { DatosNuevoPartidoBracket } from '../../types/fase';
 import type {
   EnfrentamientoConFase,
   EnfrentamientoDeLista,
@@ -226,3 +228,47 @@ export const listarEnfrentamientosDeFase = (
       equipoB: { select: { id: true, nombre: true } },
     },
   });
+
+/**
+ * Guarda el cuadro de una eliminatoria dentro de una transacción ya abierta:
+ * los partidos encadenados por siguienteId y, en ida y vuelta, cada vuelta
+ * enlazada a su ida con vueltaDeId. Se guarda de la final hacia la primera
+ * ronda, así cuando se crea un partido el que sigue ya tiene id. Dentro de cada
+ * ronda se mantiene el orden: de cada par, el de menor id es el que entra como
+ * equipo A al partido siguiente (el de mayor id entra como B). En ida y vuelta
+ * la ida tiene menor indice que su vuelta, así que ya existe cuando se la
+ * enlaza.
+ */
+export const guardarPartidosDeBracket = async (
+  tx: Prisma.TransactionClient,
+  faseId: number,
+  partidos: DatosNuevoPartidoBracket[]
+): Promise<void> => {
+  const orden = [...partidos].sort(
+    (a, b) => b.ronda - a.ronda || a.indice - b.indice
+  );
+  const idPorIndice = new Map<number, number>();
+
+  for (const partido of orden) {
+    const creado = await tx.enfrentamiento.create({
+      data: {
+        faseId,
+        equipoAId: partido.equipoAId,
+        equipoBId: partido.equipoBId,
+        ganadorId: partido.ganadorId,
+        instancia: partido.instancia,
+        siguienteId:
+          partido.siguienteIndice === null
+            ? null
+            : (idPorIndice.get(partido.siguienteIndice) ?? null),
+        vueltaDeId:
+          partido.vueltaDeIndice === undefined ||
+          partido.vueltaDeIndice === null
+            ? null
+            : (idPorIndice.get(partido.vueltaDeIndice) ?? null),
+      },
+      select: { id: true },
+    });
+    idPorIndice.set(partido.indice, creado.id);
+  }
+};

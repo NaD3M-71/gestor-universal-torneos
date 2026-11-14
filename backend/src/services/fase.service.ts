@@ -1,4 +1,4 @@
-import { EstadoTorneo } from '@prisma/enums';
+import { EstadoTorneo, type SistemaPuntuacion } from '@prisma/enums';
 import * as faseRepository from '@repositories/fase.repository';
 import {
   LINEA_DE_CORTE_POR_DEFECTO,
@@ -8,11 +8,18 @@ import {
 } from '@services/posicion.service';
 import { obtenerTorneo } from '@services/torneo.service';
 import { AppError } from '../middlewares/errors/AppError';
+import {
+  asignarEquipos,
+  expandirIdaYVuelta,
+  generarBracket,
+} from '@services/fixture/bracket.engine';
 import type { FasePublica } from '../types/fase';
 import type { Empate, FilaPosicion } from '../types/posicion';
 
 const ESTADO_FASE_ACTIVA = 'activa';
+const ESTADO_FASE_PENDIENTE = 'pendiente';
 const TIPO_FASE_ELIMINACION = 'eliminacion';
+const TIPO_FASE_LIGA = 'liga';
 
 /** Mensaje de partidos pendientes, con singular y plural. */
 const mensajePendientes = (cantidad: number): string =>
@@ -37,6 +44,50 @@ const contarPendientes = (fase: FasePublica): Promise<number> =>
     ? faseRepository.contarPendientesDeEliminacion(fase.id)
     : faseRepository.contarPendientesDeLiga(fase.id);
 
+/** Lo que devuelve cerrar una fase: ella ya cerrada y la que se armó a partir de ella. */
+export interface FaseCerrada {
+  fase: FasePublica;
+  /** La fase siguiente, ya activa y con su cuadro; null si no hay o todavía no se arma. */
+  faseSiguiente: FasePublica | null;
+}
+
+/**
+ * Arma el cuadro de la eliminatoria que sigue a una liga (liguilla): clasifican
+ * los primeros `lineaDeCorte` de la tabla y se siembran por posición, sin
+ * sorteo. El 1.° se cruza con el último clasificado, el 2.° con el anteúltimo,
+ * y así hacia el medio. Si los clasificados no son potencia de 2, los byes
+ * son para los mejor ubicados. Con ida y vuelta cada cruce da dos filas.
+ */
+const armarCuadroDeLiguilla = async (
+  torneoId: number,
+  fase: FasePublica,
+  siguiente: FasePublica,
+  sistemaPuntuacion: SistemaPuntuacion
+) => {
+  if (fase.lineaDeCorte === null) {
+    throw new AppError(
+      'La fase no tiene línea de corte: no se puede armar la fase siguiente.',
+      409
+    );
+  }
+
+  const { filas } = await calcularTablaDeFase(
+    torneoId,
+    fase,
+    sistemaPuntuacion
+  );
+  // La tabla ya viene ordenada: la posición 1 es la semilla 1.
+  const clasificados = filas
+    .filter((fila) => fila.posicion <= (fase.lineaDeCorte as number))
+    .map((fila) => fila.equipoId);
+
+  const partidos = asignarEquipos(
+    generarBracket(clasificados.length),
+    clasificados
+  );
+  return siguiente.idaYVuelta ? expandirIdaYVuelta(partidos) : partidos;
+};
+
 /**
  * Cierra una fase: la pasa a cerrada y, con eso, sus resultados quedan
  * bloqueados (cargarResultado solo acepta fases activas). El torneo tiene que
@@ -45,17 +96,16 @@ const contarPendientes = (fase: FasePublica): Promise<number> =>
  * cerrar (409), ni con un empate en puntos relevante sin resolver (409): lo
  * resuelve el organizador con la ventaja de desempate (6.3).
  *
- * Esta función solo cierra la fase. Lo que viene después se engancha acá en
- * las otras tarjetas: la generación de la fase siguiente (6.4 y 6.5) o el
- * cierre del torneo (6.6). La fase siguiente ya existe, pendiente y sin
- * enfrentamientos, desde que se creó el torneo: generarla es crear sus
- * enfrentamientos y pasarla a activa, no crear la fase.
+ * Si la fase es una liga y el formato sigue con una eliminatoria (liguilla,
+ * 6.4), al cerrarla se arma el cuadro con los clasificados y se activa la fase
+ * siguiente, todo en la misma transacción. Las otras tarjetas se enganchan
+ * acá: la de grupos (6.5) y el cierre del torneo (6.6).
  */
 export const cerrarFase = async (
   torneoId: number,
   faseId: number,
   usuarioId: number
-): Promise<FasePublica> => {
+): Promise<FaseCerrada> => {
   const torneo = await obtenerTorneo(torneoId, usuarioId);
   const fase = await faseRepository.buscarFasePorId(faseId);
 
@@ -91,7 +141,39 @@ export const cerrarFase = async (
     }
   }
 
-  return faseRepository.cerrarFase(faseId);
+  const siguiente =
+    fase.tipo === TIPO_FASE_LIGA
+      ? await faseRepository.buscarFasePorOrden(torneoId, fase.orden + 1)
+      : null;
+
+  if (siguiente === null) {
+    return {
+      fase: await faseRepository.cerrarFase(faseId),
+      faseSiguiente: null,
+    };
+  }
+
+  if (
+    siguiente.tipo !== TIPO_FASE_ELIMINACION ||
+    siguiente.estado !== ESTADO_FASE_PENDIENTE
+  ) {
+    throw new AppError(
+      'La fase siguiente no es una eliminatoria pendiente: no se puede armar.',
+      409
+    );
+  }
+
+  const partidos = await armarCuadroDeLiguilla(
+    torneoId,
+    fase,
+    siguiente,
+    torneo.sistemaPuntuacion
+  );
+  return faseRepository.cerrarFaseYActivarSiguiente(
+    faseId,
+    siguiente.id,
+    partidos
+  );
 };
 
 /**

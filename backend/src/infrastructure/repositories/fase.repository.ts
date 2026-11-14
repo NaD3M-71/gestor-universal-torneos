@@ -1,5 +1,6 @@
-import type { FasePublica } from '../../types/fase';
+import type { DatosNuevoPartidoBracket, FasePublica } from '../../types/fase';
 import { prisma } from '../database';
+import { guardarPartidosDeBracket } from './enfrentamiento.repository';
 
 /** Busca una fase por id. Devuelve null si no existe. */
 export const buscarFasePorId = (id: number): Promise<FasePublica | null> =>
@@ -60,3 +61,33 @@ export const guardarDesempate = async (
   ]);
   return fase;
 };
+
+/** Busca la fase de un torneo que ocupa un lugar del orden. Null si no hay. */
+export const buscarFasePorOrden = (
+  torneoId: number,
+  orden: number
+): Promise<FasePublica | null> =>
+  prisma.fase.findFirst({ where: { torneoId, orden } });
+
+/**
+ * Cierra una fase y arma la siguiente en una sola transacción: la siguiente
+ * pasa a activa y se guarda su cuadro de eliminación. Si algo falla no queda
+ * nada a medias (la fase no se cierra sin su fase siguiente).
+ */
+export const cerrarFaseYActivarSiguiente = (
+  faseId: number,
+  siguienteId: number,
+  partidos: DatosNuevoPartidoBracket[]
+): Promise<{ fase: FasePublica; faseSiguiente: FasePublica }> =>
+  prisma.$transaction(async (tx) => {
+    const fase = await tx.fase.update({
+      where: { id: faseId },
+      data: { estado: 'cerrada' },
+    });
+    const faseSiguiente = await tx.fase.update({
+      where: { id: siguienteId },
+      data: { estado: 'activa' },
+    });
+    await guardarPartidosDeBracket(tx, siguienteId, partidos);
+    return { fase, faseSiguiente };
+  });

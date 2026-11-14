@@ -14,16 +14,19 @@ const usuarioIdDe = (req: Request): number => {
 /**
  * PATCH /api/torneos/:torneoId/fases/:faseId/cerrar
  * Cierra una fase (sin cuerpo): sus resultados quedan bloqueados. Solo se puede
- * con todos los partidos jugados. Responde 200 con { fase } ya cerrada.
+ * con todos los partidos jugados y sin empates relevantes. Responde 200 con
+ * { fase, faseSiguiente }: la fase ya cerrada y, si el formato sigue con otra
+ * (liguilla: la eliminatoria), esa fase ya activa y con su cuadro armado; null
+ * si no hay fase siguiente.
  */
 export const cerrar = async (req: Request, res: Response): Promise<void> => {
-  const fase = await cerrarFase(
+  const resultado = await cerrarFase(
     Number(req.params.torneoId),
     Number(req.params.faseId),
     usuarioIdDe(req)
   );
 
-  res.status(200).json({ fase });
+  res.status(200).json(resultado);
 };
 
 /**
