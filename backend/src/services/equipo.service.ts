@@ -2,7 +2,7 @@ import { randomInt } from 'node:crypto';
 import { EstadoTorneo, FormatoTorneo } from '@prisma/enums';
 import * as equipoRepository from '@repositories/equipo.repository';
 import { obtenerTorneo } from '@services/torneo.service';
-import { AppError } from '../middlewares/errors/AppError';
+import { AppError } from '@middlewares/errors/AppError';
 import {
   ErrorValidacion,
   type DetalleValidacion,
