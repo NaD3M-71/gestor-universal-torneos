@@ -88,7 +88,7 @@ export const ModalDetalleTorneo: React.FC<ModalDetalleTorneoProps> = ({
             <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg text-amber-900 text-xs">
               ⚠️ <strong>Borrador activo:</strong> Las fases se encuentran
               inicializadas en estado pendiente. Puedes hacer clic en{" "}
-              <strong>"Gestionar"</strong> desde la tabla principal para
+              <strong>"Configurar"</strong> desde la tabla principal para
               inscribir a los equipos y configurar los grupos antes de dar
               inicio oficial al torneo.
             </div>

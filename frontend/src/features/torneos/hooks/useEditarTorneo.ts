@@ -14,6 +14,16 @@ import {
 } from "../../equipos/service/equipoService";
 import type { Torneo } from "../types/torneo.types";
 import type { Equipo } from "../../equipos/types/equipo.types";
+import type { ConfirmVariant } from "@components/ui/ConfirmModal";
+
+interface ModalConfirmConfig {
+  isOpen: boolean;
+  title: string;
+  message: string;
+  confirmText: string;
+  variant: ConfirmVariant;
+  onConfirm: () => Promise<void>;
+}
 
 /**
  * Función auxiliar para extraer mensajes de error detallados del backend de Giuliano.
@@ -53,6 +63,23 @@ export const useEditarTorneo = () => {
   const [equipos, setEquipos] = useState<Equipo[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Estados para notificaciones Toast y Modal de Confirmación custom
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isProcessingModal, setIsProcessingModal] = useState<boolean>(false);
+  const [modalConfig, setModalConfig] = useState<ModalConfirmConfig>({
+    isOpen: false,
+    title: "",
+    message: "",
+    confirmText: "Confirmar",
+    variant: "primary",
+    onConfirm: async () => {},
+  });
+
+  const cerrarModal = () => {
+    if (isProcessingModal) return;
+    setModalConfig((prev) => ({ ...prev, isOpen: false }));
+  };
 
   // Estado local para los grupos asignados: { [equipoId]: número de grupo }
   const [asignacionesGrupos, setAsignacionesGrupos] = useState<
@@ -134,6 +161,7 @@ export const useEditarTorneo = () => {
 
       setNombreEquipo("");
       setIntegrantesInput("");
+      setToastMessage(`Equipo "${nuevoEquipo.nombre}" inscripto.`);
     } catch (err: unknown) {
       const mensaje = formatearErrorBackend(
         err,
@@ -145,25 +173,37 @@ export const useEditarTorneo = () => {
 
   // Eliminar un equipo existente (actualización optimista local)
   const handleEliminarEquipo = async (equipoId: number) => {
-    if (!confirm("¿Estás seguro de eliminar este equipo?")) return;
-    try {
-      setError(null);
-      await eliminarEquipo(torneoId, equipoId);
+    setModalConfig({
+      isOpen: true,
+      title: "Eliminar equipo",
+      message: `¿Estás seguro de que querés quitar al equipo del torneo? Esta acción no se puede deshacer.`,
+      confirmText: "Sí, eliminar",
+      variant: "danger",
+      onConfirm: async () => {
+        try {
+          setError(null);
+          await eliminarEquipo(torneoId, equipoId);
 
-      setEquipos((prev) => prev.filter((eq) => eq.id !== equipoId));
+          setEquipos((prev) => prev.filter((eq) => eq.id !== equipoId));
 
-      setAsignacionesGrupos((prev) => {
-        const copy = { ...prev };
-        delete copy[equipoId];
-        return copy;
-      });
-    } catch (err: unknown) {
-      const mensaje = formatearErrorBackend(
-        err,
-        "No se pudo eliminar el equipo.",
-      );
-      setError(mensaje);
-    }
+          setAsignacionesGrupos((prev) => {
+            const copy = { ...prev };
+            delete copy[equipoId];
+            return copy;
+          });
+          setToastMessage(`Equipo eliminado.`);
+        } catch (err: unknown) {
+          const mensaje = formatearErrorBackend(
+            err,
+            "No se pudo eliminar el equipo.",
+          );
+          setError(mensaje);
+        } finally {
+          setIsProcessingModal(false);
+          setModalConfig((prev) => ({ ...prev, isOpen: false }));
+        }
+      },
+    });
   };
 
   // Manejar el cambio de grupo en el selector local de cada equipo
@@ -245,7 +285,7 @@ export const useEditarTorneo = () => {
         setEquipos(equiposActualizados);
       }
 
-      alert("¡Grupos guardados correctamente!");
+      setToastMessage("¡Grupos guardados correctamente!");
     } catch (err: unknown) {
       const mensaje = formatearErrorBackend(
         err,
@@ -268,7 +308,7 @@ export const useEditarTorneo = () => {
       });
       setAsignacionesGrupos(gruposNuevos);
 
-      alert("¡Sorteo de grupos realizado con éxito!");
+      setToastMessage("¡Sorteo de grupos realizado con éxito!");
     } catch (err: unknown) {
       const mensaje = formatearErrorBackend(
         err,
@@ -284,39 +324,69 @@ export const useEditarTorneo = () => {
       return;
     }
 
-    if (
-      !confirm(
-        "Una vez iniciado el torneo, la configuración quedará bloqueada y no se podrán agregar más equipos. ¿Deseas continuar?",
-      )
-    ) {
-      return;
-    }
+    const cupoMaximoConfigurado = torneo?.cantidadParticipantes || 0;
+    const inscriptosActuales = equipos.length;
+    const hayDiferenciaCupo = inscriptosActuales < cupoMaximoConfigurado;
 
-    try {
-      setError(null);
-      await iniciarTorneo(torneoId);
-      navigate("/torneos");
-    } catch (err: unknown) {
-      // Ahora muestra con exactitud el detalle del backend (ej: "Con 8 grupos hacen falta al menos 16 participantes.")
-      const mensaje = formatearErrorBackend(err, "Error al iniciar el torneo.");
-      setError(mensaje);
-    }
+    const mensaje = hayDiferenciaCupo
+      ? `Habías configurado un límite máximo de ${cupoMaximoConfigurado} participantes, pero el torneo se ajustará e iniciará oficialmente con los ${inscriptosActuales} equipos inscriptos. Una vez iniciado, no se podrán agregar ni quitar equipos.`
+      : `El torneo iniciará oficialmente con ${inscriptosActuales} equipos. Una vez iniciado, la configuración quedará bloqueada y no se podrán agregar más equipos.`;
+
+    setModalConfig({
+      isOpen: true,
+      title: hayDiferenciaCupo
+        ? "Iniciar torneo con ajuste de cupo"
+        : "Iniciar Torneo Oficial",
+      message: mensaje,
+      confirmText: "🚀 Iniciar competencia",
+      variant: hayDiferenciaCupo ? "warning" : "primary",
+      onConfirm: async () => {
+        try {
+          setIsProcessingModal(true);
+          setError(null);
+          await iniciarTorneo(torneoId);
+          navigate("/torneos");
+        } catch (err: unknown) {
+          const mensajeErr = formatearErrorBackend(
+            err,
+            "Error al iniciar el torneo.",
+          );
+          setError(mensajeErr);
+        } finally {
+          setIsProcessingModal(false);
+          setModalConfig((prev) => ({ ...prev, isOpen: false }));
+        }
+      },
+    });
   };
 
   // Cancelar/Eliminar el torneo en borrador
   const handleCancelarTorneo = async () => {
-    if (!confirm("¿Deseas cancelar este torneo?")) return;
-    try {
-      setError(null);
-      await cancelarTorneo(torneoId);
-      navigate("/torneos");
-    } catch (err: unknown) {
-      const mensaje = formatearErrorBackend(
-        err,
-        "No se pudo cancelar el torneo.",
-      );
-      setError(mensaje);
-    }
+    setModalConfig({
+      isOpen: true,
+      title: "Cancelar torneo",
+      message:
+        "¿Estás seguro de que querés cancelar este torneo en borrador? Se perderá la configuración y los equipos inscriptos.",
+      confirmText: "Sí, cancelar torneo",
+      variant: "danger",
+      onConfirm: async () => {
+        try {
+          setIsProcessingModal(true);
+          setError(null);
+          await cancelarTorneo(torneoId);
+          navigate("/torneos");
+        } catch (err: unknown) {
+          const mensajeErr = formatearErrorBackend(
+            err,
+            "No se pudo cancelar el torneo.",
+          );
+          setError(mensajeErr);
+        } finally {
+          setIsProcessingModal(false);
+          setModalConfig((prev) => ({ ...prev, isOpen: false }));
+        }
+      },
+    });
   };
 
   return {
@@ -339,6 +409,11 @@ export const useEditarTorneo = () => {
     handleEliminarEquipo,
     handleIniciarTorneo,
     handleCancelarTorneo,
+    toastMessage,
+    cerrarToast: () => setToastMessage(null),
+    modalConfig,
+    cerrarModal,
+    isProcessingModal,
     navigate,
   };
 };

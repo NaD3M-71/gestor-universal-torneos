@@ -1,5 +1,7 @@
 import React from "react";
 import { useEditarTorneo } from "../hooks/useEditarTorneo";
+import { Toast } from "@components/ui/Toast";
+import { ConfirmModal } from "@components/ui/ConfirmModal";
 
 export const EditarTorneoView: React.FC = () => {
   const {
@@ -22,6 +24,11 @@ export const EditarTorneoView: React.FC = () => {
     handleEliminarEquipo,
     handleIniciarTorneo,
     handleCancelarTorneo,
+    toastMessage,
+    cerrarToast,
+    modalConfig,
+    cerrarModal,
+    isProcessingModal,
     navigate,
   } = useEditarTorneo();
 
@@ -287,6 +294,19 @@ export const EditarTorneoView: React.FC = () => {
           )}
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={modalConfig.isOpen}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        confirmText={modalConfig.confirmText}
+        variant={modalConfig.variant}
+        isLoading={isProcessingModal}
+        onConfirm={modalConfig.onConfirm}
+        onCancel={cerrarModal}
+      />
+
+      <Toast message={toastMessage} type="success" onClose={cerrarToast} />
     </div>
   );
 };
